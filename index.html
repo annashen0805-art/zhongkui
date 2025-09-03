@@ -48,27 +48,25 @@
         }
         #game-area {
             position: relative;
-            width: 80vw;
+            width: 80%;
             max-width: 800px;
-            height: 50vh;
+            height: 400px;
             max-height: 400px;
-            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.1)), url('https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/gameareabackground.jpg') no-repeat center center;
+            background: url('https://i.ibb.co/PZbrMCsh/IMG-5097.png') no-repeat center center;
             background-size: cover;
             border: 2px solid #333;
             overflow: hidden;
-            perspective: 1000px;
-            transition: background 0.5s ease;
-            display: none;
             z-index: 5;
+            display: none;
         }
         #character {
             position: absolute;
             bottom: 0;
             left: 50%;
-            transform: translateX(-50%) scaleX(1);
-            width: 18vw;
+            transform: translateX(-50%) scaleX(1) translateZ(0);
+            width: 180px;
             max-width: 180px;
-            height: 12vw;
+            height: 120px;
             max-height: 120px;
             background-image: url('https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/characters.png');
             background-size: contain;
@@ -76,27 +74,28 @@
             background-color: transparent;
             transition: transform 0.3s ease, left 0.2s ease;
             z-index: 6;
+            will-change: transform, left;
         }
         .coin {
             position: absolute;
-            width: 7vw;
+            width: 70px;
             max-width: 70px;
-            height: 7vw;
+            height: 70px;
             max-height: 70px;
             background-image: url('https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/coin.png');
             background-size: contain;
             background-repeat: no-repeat;
             background-color: #ffd700;
             border-radius: 50%;
-            animation: fall var(--fall-duration, 6s) linear 1, spin3d 2s linear infinite;
-            transform-style: preserve-3d;
+            animation: fall var(--fall-duration, 6s) linear 1, spin2d 2s linear infinite;
             z-index: 6;
+            will-change: transform, top;
         }
         .explosion {
             position: absolute;
-            width: 8vw;
+            width: 80px;
             max-width: 80px;
-            height: 8vw;
+            height: 80px;
             max-height: 80px;
             background: radial-gradient(circle, 
                 rgba(255, 255, 0, 0.9) 0%, 
@@ -109,21 +108,22 @@
             animation: explode 0.6s ease-out forwards;
             pointer-events: none;
             z-index: 7;
+            will-change: width, height, opacity;
         }
         @keyframes fall {
-            0% { top: -7vw; }
-            100% { top: calc(50vh + 7vw); }
+            0% { top: -70px; }
+            100% { top: 470px; }
         }
-        @keyframes spin3d {
-            0% { transform: rotate3d(1, 1, 1, 0deg); }
-            100% { transform: rotate3d(1, 1, 1, 360deg); }
+        @keyframes spin2d {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         @keyframes explode {
-            0% { width: 8vw; height: 8vw; max-width: 80px; max-height: 80px; opacity: 1; }
-            20% { width: 16vw; height: 16vw; max-width: 160px; max-height: 160px; opacity: 0.9; }
-            40% { width: 32vw; height: 32vw; max-width: 320px; max-height: 320px; opacity: 0.7; }
-            60% { width: 48vw; height: 48vw; max-width: 480px; max-height: 480px; opacity: 0.5; }
-            100% { width: 60vw; height: 60vw; max-width: 600px; max-height: 600px; opacity: 0; }
+            0% { width: 80px; height: 80px; opacity: 1; }
+            20% { width: 160px; height: 160px; opacity: 0.9; }
+            40% { width: 320px; height: 320px; opacity: 0.7; }
+            60% { width: 480px; height: 480px; opacity: 0.5; }
+            100% { width: 600px; height: 600px; opacity: 0; }
         }
         @keyframes glow {
             0% { box-shadow: 0 0 10px yellow; }
@@ -132,10 +132,8 @@
         .glow {
             animation: glow 0.3s ease-out;
         }
-        #score {
+        #score, #life, #level {
             position: absolute;
-            top: 10px;
-            left: 10px;
             font-family: Arial, sans-serif;
             font-size: 24px;
             color: #333;
@@ -144,30 +142,9 @@
             border-radius: 5px;
             z-index: 8;
         }
-        #life {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            font-family: Arial, sans-serif;
-            font-size: 24px;
-            color: #333;
-            background-color: rgba(255, 255, 255, 0.8);
-            padding: 5px 10px;
-            border-radius: 5px;
-            z-index: 8;
-        }
-        #level {
-            position: absolute;
-            top: 60px;
-            left: 10px;
-            font-family: Arial, sans-serif;
-            font-size: 24px;
-            color: #333;
-            background-color: rgba(255, 255, 255, 0.8);
-            padding: 5px 10px;
-            border-radius: 5px;
-            z-index: 8;
-        }
+        #score { top: 10px; left: 10px; }
+        #life { top: 10px; right: 10px; }
+        #level { top: 60px; left: 10px; }
         #game-over {
             position: absolute;
             top: 50%;
@@ -189,18 +166,9 @@
             gap: 8px;
             line-height: 1.2;
         }
-        #controls {
+        #controls, #restart-container {
             position: relative;
             margin-top: 10px;
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            display: none;
-            z-index: 8;
-        }
-        #restart-container {
-            position: relative;
-            margin-top: 15px;
             display: flex;
             gap: 15px;
             justify-content: center;
@@ -272,6 +240,7 @@
         const restartButton = document.getElementById('restart-button');
         const bgMusic = document.getElementById('bg-music');
 
+        const isMobile = /Mobi|Android/i.test(navigator.userAgent);
         const gameConfig = {
             medium: {
                 maxLife: 5,
@@ -279,11 +248,11 @@
                 spawnIntervalDecrease: 25,
                 minSpawnInterval: 500,
                 moveSpeed: 5,
-                jumpHeight: '-15vh',
+                jumpHeight: '-150px',
                 initialFallDuration: 6,
                 fallDurationDecrease: 0.3,
                 minFallDuration: 2,
-                maxCoins: (level) => Math.min(15, Math.floor(level / 2) + 5),
+                maxCoins: (level) => isMobile ? Math.min(8, Math.floor(level / 2) + 3) : Math.min(15, Math.floor(level / 2) + 5),
             },
         };
 
@@ -299,14 +268,20 @@
         let lastSpawnTime = 0;
         let characterX = 50;
         let isFacingRight = true;
-        let moveDirection = 0; // -1 for left, 1 for right, 0 for none
+        let moveDirection = 0;
         let lastCollisionCheck = 0;
-        const collisionCheckInterval = 100; // Check collisions every 100ms
-        const coins = []; // Cache coin elements
+        let lastFrameTime = 0;
+        const collisionCheckInterval = 200;
+        const coins = [];
         const explosionPool = [];
-        const maxExplosionPoolSize = 10; // Limit pool size
+        const maxExplosionPoolSize = 10;
+        let gameAreaRect = null;
 
-        // Preload images
+        // Fallback base64 images (replace with actual base64 strings for your assets)
+        const fallbackCharacterImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGURgAAAABJRU5ErkJggg==';
+        const fallbackCoinImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHogJ/PdX9BAAAAABJRU5ErkJggg==';
+
+        // Preload images and audio
         const preloadImages = [
             'https://i.ibb.co/GKJ0mzX/IMG-5096.jpg',
             'https://i.ibb.co/PZbrMCsh/IMG-5097.png',
@@ -317,8 +292,14 @@
             const img = new Image();
             img.src = src;
         });
-
+        bgMusic.load();
         bgMusic.volume = 0.3;
+
+        function updateGameAreaRect() {
+            gameAreaRect = gameArea.getBoundingClientRect();
+        }
+        window.addEventListener('resize', updateGameAreaRect);
+        updateGameAreaRect();
 
         function startGame() {
             startScreen.style.display = 'none';
@@ -336,9 +317,9 @@
         function jump() {
             if (!isJumping && !isGameOver) {
                 isJumping = true;
-                character.style.transform = `translateX(-50%) translateY(${currentConfig.jumpHeight}) scaleX(${isFacingRight ? 1 : -1})`;
+                character.style.transform = `translateX(-50%) translateY(${currentConfig.jumpHeight}) scaleX(${isFacingRight ? 1 : -1}) translateZ(0)`;
                 setTimeout(() => {
-                    character.style.transform = `translateX(-50%) translateY(0) scaleX(${isFacingRight ? 1 : -1})`;
+                    character.style.transform = `translateX(-50%) translateY(0) scaleX(${isFacingRight ? 1 : -1}) translateZ(0)`;
                     isJumping = false;
                 }, 300);
             }
@@ -349,7 +330,7 @@
                 characterX = Math.max(9, Math.min(91, characterX + moveDirection * currentConfig.moveSpeed));
                 character.style.left = `${characterX}%`;
                 isFacingRight = moveDirection > 0;
-                character.style.transform = `translateX(-50%) scaleX(${isFacingRight ? 1 : -1})${isJumping ? ` translateY(${currentConfig.jumpHeight})` : ''}`;
+                character.style.transform = `translateX(-50%) scaleX(${isFacingRight ? 1 : -1})${isJumping ? ` translateY(${currentConfig.jumpHeight})` : ''} translateZ(0)`;
             }
         }
 
@@ -378,21 +359,17 @@
             e.preventDefault();
             if (!isGameOver) moveDirection = -1;
         });
-
         leftButton.addEventListener('touchstart', (e) => {
             e.preventDefault();
             if (!isGameOver) moveDirection = -1;
         });
-
         leftButton.addEventListener('mouseup', () => {
             moveDirection = 0;
         });
-
         leftButton.addEventListener('touchend', (e) => {
             e.preventDefault();
             moveDirection = 0;
         });
-
         leftButton.addEventListener('mouseleave', () => {
             moveDirection = 0;
         });
@@ -401,21 +378,17 @@
             e.preventDefault();
             if (!isGameOver) moveDirection = 1;
         });
-
         rightButton.addEventListener('touchstart', (e) => {
             e.preventDefault();
             if (!isGameOver) moveDirection = 1;
         });
-
         rightButton.addEventListener('mouseup', () => {
             moveDirection = 0;
         });
-
         rightButton.addEventListener('touchend', (e) => {
             e.preventDefault();
             moveDirection = 0;
         });
-
         rightButton.addEventListener('mouseleave', () => {
             moveDirection = 0;
         });
@@ -427,36 +400,37 @@
 
         let touchStartX = 0;
         let lastTouchMove = 0;
-        const touchMoveThrottle = 50; // Throttle touchmove to every 50ms
+        let hasSwiped = false;
+        const touchMoveThrottle = 100;
         gameArea.addEventListener('touchstart', (e) => {
             e.preventDefault();
             touchStartX = e.touches[0].clientX;
+            hasSwiped = false;
         });
 
         gameArea.addEventListener('touchmove', (e) => {
             e.preventDefault();
+            if (e.touches.length > 1) return;
             if (performance.now() - lastTouchMove < touchMoveThrottle) return;
             lastTouchMove = performance.now();
             let touchEndX = e.touches[0].clientX;
             const swipeThreshold = 50 / window.devicePixelRatio;
-            if (touchEndX - touchStartX > swipeThreshold) {
-                moveDirection = 1;
-            } else if (touchStartX - touchEndX > swipeThreshold) {
-                moveDirection = -1;
+            if (Math.abs(touchEndX - touchStartX) > swipeThreshold) {
+                hasSwiped = true;
+                moveDirection = touchEndX > touchStartX ? 1 : -1;
             }
         });
 
         gameArea.addEventListener('touchend', (e) => {
             e.preventDefault();
             moveDirection = 0;
-            jump();
+            if (!hasSwiped) jump();
+            hasSwiped = false;
         });
 
         character.addEventListener('click', (e) => {
             e.stopPropagation();
-            if (/Mobi|Android/i.test(navigator.userAgent)) {
-                jump();
-            }
+            if (isMobile) jump();
         });
 
         restartButton.addEventListener('click', () => {
@@ -483,12 +457,10 @@
             isFacingRight = true;
             moveDirection = 0;
             character.style.left = `${characterX}%`;
-            character.style.transform = `translateX(-50%) scaleX(1)`;
+            character.style.transform = `translateX(-50%) scaleX(1) translateZ(0)`;
             scoreDisplay.textContent = `得分: ${score} | 最高分: ${highScore}`;
             lifeDisplay.textContent = `生命: ${life}`;
-            if (levelDisplay) {
-                levelDisplay.textContent = `等级: ${level}`;
-            }
+            if (levelDisplay) levelDisplay.textContent = `等级: ${level}`;
             gameOverDisplay.style.display = 'none';
             gameOverDisplay.innerHTML = `
                 <div>游戏结束！</div>
@@ -499,15 +471,23 @@
                 <div>点击或按 Enter 重新开始</div>
             `;
             updateGameAreaBackground();
-            coins.length = 0; // Clear coin array
-            document.querySelectorAll('.coin').forEach(coin => coin.remove());
+            coins.forEach(coin => {
+                if (coin.parentNode) {
+                    coin.cleanup();
+                    coin.remove();
+                }
+            });
+            coins.length = 0;
             coinCount = 0;
             const initialCoinCount = Math.floor(Math.random() * 5) + 1;
             for (let i = 0; i < initialCoinCount; i++) {
                 spawnCoin();
             }
             lastSpawnTime = performance.now();
+            lastCollisionCheck = performance.now();
+            lastFrameTime = performance.now();
             updateCoinSpeed();
+            updateGameAreaRect();
             requestAnimationFrame(gameLoop);
             bgMusic.play().catch(error => {
                 console.error('背景音乐播放失败:', error);
@@ -517,12 +497,13 @@
         function getExplosion() {
             let explosion = explosionPool.find(e => !e.parentNode);
             if (!explosion) {
+                if (explosionPool.length >= maxExplosionPoolSize) {
+                    explosion = explosionPool.shift();
+                    if (explosion.parentNode) explosion.remove();
+                }
                 explosion = document.createElement('div');
                 explosion.classList.add('explosion');
                 explosionPool.push(explosion);
-                if (explosionPool.length > maxExplosionPoolSize) {
-                    explosionPool.shift(); // Remove oldest explosion
-                }
             }
             return explosion;
         }
@@ -549,13 +530,13 @@
                 isValidPosition = true;
                 coins.forEach(existingCoin => {
                     const existingRect = existingCoin.getBoundingClientRect();
-                    if (Math.abs(randomX - (existingRect.left - gameArea.getBoundingClientRect().left)) < 80) {
+                    if (Math.abs(randomX - (existingRect.left - gameAreaRect.left)) < 80) {
                         isValidPosition = false;
                     }
                 });
             } while (!isValidPosition);
             coin.style.left = `${randomX}px`;
-            coin.style.top = '-7vw';
+            coin.style.top = '-70px';
             const fallDuration = Math.max(
                 currentConfig.minFallDuration,
                 currentConfig.initialFallDuration - (level - 1) * currentConfig.fallDurationDecrease
@@ -566,28 +547,26 @@
             coinCount++;
 
             coin.onerror = () => {
-                coin.style.backgroundImage = 'url("path/to/fallback-coin.png")';
+                coin.style.backgroundImage = `url("${fallbackCoinImage}")`;
+                console.warn('Coin image failed to load, using fallback.');
             };
 
             const handleAnimationEnd = (e) => {
                 if (e.animationName === 'fall' && coin.parentNode) {
+                    coin.cleanup();
                     coin.remove();
                     coins.splice(coins.indexOf(coin), 1);
                     coinCount--;
                     life--;
                     lifeDisplay.textContent = `生命: ${life}`;
                     updateGameAreaBackground();
-                    if (life <= 0) {
-                        gameOver();
-                    }
+                    if (life <= 0) gameOver();
                 }
             };
 
             const handleClick = (e) => {
                 e.stopPropagation();
-                if (!isGameOver) {
-                    collectCoin(coin);
-                }
+                if (!isGameOver) collectCoin(coin);
             };
 
             coin.addEventListener('animationend', handleAnimationEnd);
@@ -595,12 +574,13 @@
             coin.cleanup = () => {
                 coin.removeEventListener('animationend', handleAnimationEnd);
                 coin.removeEventListener('click', handleClick);
+                coin.onerror = null;
             };
         }
 
-        let lastBackgroundUpdateLife = life; // Track last life for background updates
+        let lastBackgroundUpdateLife = life;
         function updateGameAreaBackground() {
-            if (lastBackgroundUpdateLife === life) return; // Skip if life hasn't changed
+            if (lastBackgroundUpdateLife === life) return;
             lastBackgroundUpdateLife = life;
             const redIntensity = (currentConfig.maxLife - life) / currentConfig.maxLife;
             gameArea.style.background = `linear-gradient(to bottom, rgba(255, 102, 102, ${redIntensity * 0.7}), rgba(255, 255, 255, 0.1)), url("https://i.ibb.co/PZbrMCsh/IMG-5097.png") no-repeat center center`;
@@ -612,9 +592,7 @@
             const newLevel = Math.floor(score / 100) + 1;
             if (newLevel > level) {
                 level = newLevel;
-                if (levelDisplay) {
-                    levelDisplay.textContent = `等级: ${level}`;
-                }
+                if (levelDisplay) levelDisplay.textContent = `等级: ${level}`;
                 updateCoinSpeed();
             }
             highScore = Math.max(highScore, score);
@@ -623,7 +601,6 @@
             spawnInterval = Math.max(currentConfig.minSpawnInterval, spawnInterval - currentConfig.spawnIntervalDecrease);
 
             const rect = coin.getBoundingClientRect();
-            const gameAreaRect = gameArea.getBoundingClientRect();
             const explosion = getExplosion();
             explosion.style.left = `${rect.left - gameAreaRect.left + rect.width / 2 - 40}px`;
             explosion.style.top = `${rect.top - gameAreaRect.top + rect.height / 2 - 40}px`;
@@ -646,18 +623,18 @@
         function checkCollisions() {
             if (isGameOver) return;
             const characterRect = character.getBoundingClientRect();
+            const hitboxPaddingX = characterRect.width * 0.1;
+            const hitboxPaddingY = characterRect.height * 0.1;
+            const adjustedCharacterRect = {
+                left: characterRect.left + hitboxPaddingX,
+                right: characterRect.right - hitboxPaddingX,
+                top: characterRect.top + hitboxPaddingY,
+                bottom: characterRect.bottom - hitboxPaddingY,
+            };
             const coinsToRemove = [];
             coins.forEach((coin) => {
                 if (!coin.parentNode) return;
                 const coinRect = coin.getBoundingClientRect();
-                const hitboxPaddingX = characterRect.width * 0.1;
-                const hitboxPaddingY = characterRect.height * 0.1;
-                const adjustedCharacterRect = {
-                    left: characterRect.left + hitboxPaddingX,
-                    right: characterRect.right - hitboxPaddingX,
-                    top: characterRect.top + hitboxPaddingY,
-                    bottom: characterRect.bottom - hitboxPaddingY,
-                };
                 if (
                     adjustedCharacterRect.left < coinRect.right &&
                     adjustedCharacterRect.right > coinRect.left &&
@@ -693,8 +670,9 @@
         }
 
         function gameLoop(timestamp) {
-            if (!isGameOver) {
+            if (!isGameOver && timestamp - lastFrameTime >= 16) {
                 try {
+                    const start = performance.now();
                     updateCharacterPosition();
                     if (timestamp - lastCollisionCheck >= collisionCheckInterval) {
                         checkCollisions();
@@ -704,15 +682,20 @@
                         spawnCoin();
                         lastSpawnTime = timestamp;
                     }
-                    requestAnimationFrame(gameLoop);
+                    lastFrameTime = timestamp;
+                    const duration = performance.now() - start;
+                    if (duration > 16) console.warn(`Slow frame: ${duration.toFixed(2)}ms`);
                 } catch (error) {
                     console.error('游戏循环错误:', error);
+                    gameOver();
                 }
             }
+            if (!isGameOver) requestAnimationFrame(gameLoop);
         }
 
         character.onerror = () => {
-            character.style.backgroundImage = 'url("path/to/fallback-character.png")';
+            character.style.backgroundImage = `url("${fallbackCharacterImage}")`;
+            console.warn('Character image failed to load, using fallback.');
         };
 
         document.addEventListener('visibilitychange', () => {
@@ -723,6 +706,9 @@
                 isGameOver = false;
                 lastSpawnTime = performance.now();
                 lastCollisionCheck = performance.now();
+                lastFrameTime = performance.now();
+                updateGameAreaRect();
+                updateCoinSpeed();
                 requestAnimationFrame(gameLoop);
                 bgMusic.play().catch(error => {
                     console.error('背景音乐播放失败:', error);
@@ -741,7 +727,3 @@
     </script>
 </body>
 </html>
-
-
-
-
