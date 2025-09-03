@@ -1,3 +1,5 @@
+console.log('game.js loaded');
+
 const startScreen = document.getElementById('start-screen');
 const startButton = document.getElementById('start-button');
 const gameArea = document.getElementById('game-area');
@@ -14,6 +16,24 @@ const rightButton = document.getElementById('right-button');
 const restartButton = document.getElementById('restart-button');
 const bgMusic = document.getElementById('bg-music');
 
+// Validate critical DOM elements
+const missingElements = [];
+if (!startScreen) missingElements.push('start-screen');
+if (!startButton) missingElements.push('start-button');
+if (!gameArea) missingElements.push('game-area');
+if (!character) missingElements.push('character');
+if (!scoreDisplay) missingElements.push('score');
+if (!lifeDisplay) missingElements.push('life');
+if (!levelDisplay) missingElements.push('level');
+if (!gameOverDisplay) missingElements.push('game-over');
+if (missingElements.length > 0) {
+    console.error(`Missing DOM elements: ${missingElements.join(', ')}`);
+    document.body.innerHTML = `<div style="color: red; text-align: center; padding: 20px;">
+        错误：无法找到必要的页面元素 (${missingElements.join(', ')})。请检查HTML结构并刷新页面。
+    </div>`;
+    throw new Error(`Missing DOM elements: ${missingElements.join(', ')}`);
+}
+
 const isMobile = /Mobi|Android/i.test(navigator.userAgent);
 const gameConfig = {
     medium: {
@@ -26,7 +46,7 @@ const gameConfig = {
         initialFallDuration: 6,
         fallDurationDecrease: 0.3,
         minFallDuration: 2,
-        maxCoins: (level) => isMobile ? Math.min(8, Math.floor(level / 2) + 3) : Math.min(15, Math.floor(level / 2) + 5),
+        maxCoins: (level) => isMobile ? Math.min(5, Math.floor(level / 2) + 3) : Math.min(10, Math.floor(level / 2) + 5),
     },
 };
 
@@ -50,25 +70,43 @@ const coins = [];
 const explosionPool = [];
 const maxExplosionPoolSize = 10;
 let gameAreaRect = null;
+let cachedCharacterRect = null;
+let lastBackgroundUpdateLife = life;
 
 // Fallback base64 images (replace with actual base64 strings)
 const fallbackCharacterImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGURgAAAABJRU5ErkJggg==';
 const fallbackCoinImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHogJ/PdX9BAAAAABJRU5ErkJggg==';
 
-// Preload images and audio
+// Preload images
 const preloadImages = [
-    'https://i.ibb.co/GKJ0mzX/IMG-5096.jpg',
-    'https://i.ibb.co/PZbrMCsh/IMG-5097.png',
-    'https://i.ibb.co/2mpzr9Y/IMG-5090.png',
-    'https://i.ibb.co/LhvzWrfc/IMG-5089.webp',
+    'https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/characters.png',
+    'https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/coin.png',
+    'https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/gameareabackground.jpg',
+    'https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/bodybackground.jpg',
 ];
 preloadImages.forEach(src => {
     const img = new Image();
     img.src = src;
-    img.onerror = () => console.warn(`Failed to preload image: ${src}`);
+    img.onerror = () => {
+        console.error(`Failed to load image: ${src}`);
+        if (src.includes('characters.png')) {
+            character.style.backgroundImage = `url("${fallbackCharacterImage}")`;
+        } else if (src.includes('coin.png')) {
+            coins.forEach(coin => {
+                coin.style.backgroundImage = `url("${fallbackCoinImage}")`;
+            });
+        } else if (src.includes('gameareabackground.jpg')) {
+            gameArea.style.background = 'linear-gradient(to bottom, rgba(255, 102, 102, 0), rgba(255, 255, 255, 0.1))';
+        } else if (src.includes('bodybackground.jpg')) {
+            document.body.style.background = '#000';
+        }
+    };
 });
 bgMusic.load();
 bgMusic.volume = 0.3;
+bgMusic.onerror = () => {
+    console.error('Failed to load audio: https://zhongkui-okayplay.com/zhongkui.mp3');
+};
 
 function updateGameAreaRect() {
     try {
@@ -77,11 +115,17 @@ function updateGameAreaRect() {
         console.error('Failed to update game area rect:', error);
     }
 }
-window.addEventListener('resize', updateGameAreaRect);
+
+let resizeTimeout;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(updateGameAreaRect, 100);
+});
 updateGameAreaRect();
 
 function startGame() {
     try {
+        console.log('Starting game...');
         startScreen.style.display = 'none';
         gameArea.style.display = 'block';
         controls.style.display = 'flex';
@@ -90,6 +134,7 @@ function startGame() {
             console.error('背景音乐播放失败:', error);
         });
         restartGame();
+        console.log('Game started, game area should be visible');
     } catch (error) {
         console.error('Failed to start game:', error);
         showError('无法启动游戏，请刷新页面重试。');
@@ -101,10 +146,12 @@ startButton.addEventListener('click', startGame);
 function jump() {
     if (!isJumping && !isGameOver) {
         isJumping = true;
+        cachedCharacterRect = null; // Invalidate cache on jump
         character.style.transform = `translateX(-50%) translateY(${currentConfig.jumpHeight}) scaleX(${isFacingRight ? 1 : -1}) translateZ(0)`;
         setTimeout(() => {
             character.style.transform = `translateX(-50%) translateY(0) scaleX(${isFacingRight ? 1 : -1}) translateZ(0)`;
             isJumping = false;
+            cachedCharacterRect = null; // Invalidate cache after jump
         }, 300);
     }
 }
@@ -115,6 +162,7 @@ function updateCharacterPosition() {
         character.style.left = `${characterX}%`;
         isFacingRight = moveDirection > 0;
         character.style.transform = `translateX(-50%) scaleX(${isFacingRight ? 1 : -1})${isJumping ? ` translateY(${currentConfig.jumpHeight})` : ''} translateZ(0)`;
+        cachedCharacterRect = null; // Invalidate cache on movement
     }
 }
 
@@ -185,7 +233,7 @@ jumpButton.addEventListener('click', (e) => {
 let touchStartX = 0;
 let lastTouchMove = 0;
 let hasSwiped = false;
-const touchMoveThrottle = 100;
+const touchMoveThrottle = 50;
 gameArea.addEventListener('touchstart', (e) => {
     e.preventDefault();
     touchStartX = e.touches[0].clientX;
@@ -203,7 +251,7 @@ gameArea.addEventListener('touchmove', (e) => {
         hasSwiped = true;
         moveDirection = touchEndX > touchStartX ? 1 : -1;
     }
-});
+}, { passive: false });
 
 gameArea.addEventListener('touchend', (e) => {
     e.preventDefault();
@@ -254,8 +302,8 @@ function restartGame() {
         moveDirection = 0;
         character.style.left = `${characterX}%`;
         character.style.transform = `translateX(-50%) scaleX(1) translateZ(0)`;
-        scoreDisplay.textContent = `得分: ${score} | 最高分: ${highScore}`;
-        lifeDisplay.textContent = `生命: ${life}`;
+        if (scoreDisplay) scoreDisplay.textContent = `得分: ${score} | 最高分: ${highScore}`;
+        if (lifeDisplay) lifeDisplay.textContent = `生命: ${life}`;
         if (levelDisplay) levelDisplay.textContent = `等级: ${level}`;
         gameOverDisplay.style.display = 'none';
         gameOverDisplay.innerHTML = `
@@ -266,7 +314,6 @@ function restartGame() {
             <div>生命: ${life}</div>
             <div>点击或按 Enter 重新开始</div>
         `;
-        updateGameAreaBackground();
         coins.forEach(coin => {
             if (coin.parentNode) {
                 coin.cleanup();
@@ -275,6 +322,7 @@ function restartGame() {
         });
         coins.length = 0;
         coinCount = 0;
+        cachedCharacterRect = null;
         const initialCoinCount = Math.floor(Math.random() * 5) + 1;
         for (let i = 0; i < initialCoinCount; i++) {
             spawnCoin();
@@ -284,6 +332,10 @@ function restartGame() {
         lastFrameTime = performance.now();
         updateCoinSpeed();
         updateGameAreaRect();
+        startScreen.style.display = 'none';
+        gameArea.style.display = 'block';
+        controls.style.display = 'flex';
+        restartContainer.style.display = 'flex';
         requestAnimationFrame(gameLoop);
         bgMusic.play().catch(error => {
             console.error('背景音乐播放失败:', error);
@@ -306,6 +358,9 @@ function getExplosion() {
             explosion.classList.add('explosion');
             explosionPool.push(explosion);
         }
+        explosion.addEventListener('animationend', () => {
+            if (explosion.parentNode) explosion.remove();
+        });
         return explosion;
     } catch (error) {
         console.error('Failed to create explosion:', error);
@@ -368,8 +423,7 @@ function spawnCoin() {
                 coins.splice(coins.indexOf(coin), 1);
                 coinCount--;
                 life--;
-                lifeDisplay.textContent = `生命: ${life}`;
-                updateGameAreaBackground();
+                if (lifeDisplay) lifeDisplay.textContent = `生命: ${life}`;
                 if (life <= 0) gameOver();
             }
         };
@@ -385,25 +439,12 @@ function spawnCoin() {
             coin.removeEventListener('animationend', handleAnimationEnd);
             coin.removeEventListener('click', handleClick);
             coin.onerror = null;
+            coin.style.animation = 'none';
         };
     } catch (error) {
         console.error('Failed to spawn coin:', error);
     }
 }
-
-let lastBackgroundUpdateLife = life;
-function updateGameAreaBackground() {
-    try {
-        if (lastBackgroundUpdateLife === life) return;
-        lastBackgroundUpdateLife = life;
-        const redIntensity = (currentConfig.maxLife - life) / currentConfig.maxLife;
-        gameArea.style.background = `linear-gradient(to bottom, rgba(255, 102, 102, ${redIntensity * 0.7}), rgba(255, 255, 255, 0.1)), url("https://i.ibb.co/PZbrMCsh/IMG-5097.png") no-repeat center center`;
-        gameArea.style.backgroundSize = 'cover';
-    } catch (error) {
-        console.error('Failed to update game area background:', error);
-    }
-}
-
 function collectCoin(coin) {
     try {
         score += 10;
@@ -415,7 +456,7 @@ function collectCoin(coin) {
         }
         highScore = Math.max(highScore, score);
         localStorage.setItem('highScore', highScore);
-        scoreDisplay.textContent = `得分: ${score} | 最高分: ${highScore}`;
+        if (scoreDisplay) scoreDisplay.textContent = `得分: ${score} | 最高分: ${highScore}`;
         spawnInterval = Math.max(currentConfig.minSpawnInterval, spawnInterval - currentConfig.spawnIntervalDecrease);
 
         const rect = coin.getBoundingClientRect();
@@ -446,24 +487,26 @@ function collectCoin(coin) {
 function checkCollisions() {
     if (isGameOver) return;
     try {
-        const characterRect = character.getBoundingClientRect();
-        const hitboxPaddingX = characterRect.width * 0.1;
-        const hitboxPaddingY = characterRect.height * 0.1;
-        const adjustedCharacterRect = {
-            left: characterRect.left + hitboxPaddingX,
-            right: characterRect.right - hitboxPaddingX,
-            top: characterRect.top + hitboxPaddingY,
-            bottom: characterRect.bottom - hitboxPaddingY,
-        };
+        if (!cachedCharacterRect) {
+            const characterRect = character.getBoundingClientRect();
+            const hitboxPaddingX = characterRect.width * 0.1;
+            const hitboxPaddingY = characterRect.height * 0.1;
+            cachedCharacterRect = {
+                left: characterRect.left + hitboxPaddingX,
+                right: characterRect.right - hitboxPaddingX,
+                top: characterRect.top + hitboxPaddingY,
+                bottom: characterRect.bottom - hitboxPaddingY,
+            };
+        }
         const coinsToRemove = [];
         coins.forEach((coin) => {
             if (!coin.parentNode) return;
             const coinRect = coin.getBoundingClientRect();
             if (
-                adjustedCharacterRect.left < coinRect.right &&
-                adjustedCharacterRect.right > coinRect.left &&
-                adjustedCharacterRect.top < coinRect.bottom &&
-                adjustedCharacterRect.bottom > coinRect.top
+                cachedCharacterRect.left < coinRect.right &&
+                cachedCharacterRect.right > coinRect.left &&
+                cachedCharacterRect.top < coinRect.bottom &&
+                cachedCharacterRect.bottom > coinRect.top
             ) {
                 coinsToRemove.push(coin);
             }
@@ -506,6 +549,7 @@ function gameLoop(timestamp) {
         try {
             const start = performance.now();
             updateCharacterPosition();
+            if (!gameAreaRect) updateGameAreaRect();
             if (timestamp - lastCollisionCheck >= collisionCheckInterval) {
                 checkCollisions();
                 lastCollisionCheck = timestamp;
@@ -516,9 +560,11 @@ function gameLoop(timestamp) {
             }
             lastFrameTime = timestamp;
             const duration = performance.now() - start;
-            if (duration > 16) console.warn(`Slow frame: ${duration.toFixed(2)}ms`);
+            if (duration > 16) {
+                console.warn(`Slow frame: ${duration.toFixed(2)}ms, coins: ${coinCount}, level: ${level}`);
+            }
         } catch (error) {
-            console.error('游戏循环错误:', error);
+            console.error('Game loop error:', error);
             showError('游戏循环错误，请刷新页面重试。');
         }
     }
@@ -540,11 +586,12 @@ document.addEventListener('visibilitychange', () => {
             lastSpawnTime = performance.now();
             lastCollisionCheck = performance.now();
             lastFrameTime = performance.now();
+            cachedCharacterRect = null;
             updateGameAreaRect();
             updateCoinSpeed();
             requestAnimationFrame(gameLoop);
             bgMusic.play().catch(error => {
-                console.error('背景音乐播放失败:', error);
+                console.error('Background music failed to play:', error);
             });
         }
     } catch (error) {
@@ -552,16 +599,33 @@ document.addEventListener('visibilitychange', () => {
     }
 });
 
-// Initialize game state
-try {
-    scoreDisplay.textContent = `得分: ${score} | 最高分: ${highScore}`;
-    lifeDisplay.textContent = `生命: ${life}`;
-    if (levelDisplay) {
-        levelDisplay.textContent = `等级: ${level}`;
-    } else {
-        console.error('levelDisplay is null; check if #level element exists in the DOM');
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('DOM content loaded');
+    try {
+        // Re-query elements in case they were loaded late
+        const scoreDisplay = document.getElementById('score');
+        const lifeDisplay = document.getElementById('life');
+        const levelDisplay = document.getElementById('level');
+        const missingElements = [];
+        if (!scoreDisplay) missingElements.push('score');
+        if (!lifeDisplay) missingElements.push('life');
+        if (!levelDisplay) missingElements.push('level');
+        if (missingElements.length > 0) {
+            console.error(`Missing DOM elements during initialization: ${missingElements.join(', ')}`);
+            // Fallback: Show start screen and allow game to proceed
+            startScreen.style.display = 'block';
+            document.body.innerHTML += `<div style="color: red; text-align: center; padding: 10px;">
+                警告：缺少元素 (${missingElements.join(', ')})。游戏可能不完整。
+            </div>`;
+        } else {
+            scoreDisplay.textContent = `得分: ${score} | 最高分: ${highScore}`;
+            lifeDisplay.textContent = `生命: ${life}`;
+            levelDisplay.textContent = `等级: ${level}`;
+        }
+        startScreen.style.display = 'block';
+        console.log('Initial game state set');
+    } catch (error) {
+        console.error('Failed to initialize game state:', error);
+        showError('游戏初始化失败，请检查页面元素并刷新重试。');
     }
-} catch (error) {
-    console.error('Failed to initialize game state:', error);
-    showError('游戏初始化失败，请刷新页面重试。');
-}
+});
