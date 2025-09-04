@@ -113,8 +113,8 @@
             bottom: 0;
             left: 50%;
             transform: translateX(-50%) scaleX(1) translateZ(0);
-            width: 180px;
-            max-width: 180px;
+            width: 150px;
+            max-width: 150px;
             height: 120px;
             max-height: 120px;
             background-image: url('https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/characters.png');
@@ -374,6 +374,14 @@
                 0% { box-shadow: 0 0 5px yellow; }
                 100% { box-shadow: 0 0 0 transparent; }
             }
+            @keyframes turnRight {
+                from { transform: translateX(-50%) rotateY(180deg) translateZ(0); }
+                to { transform: translateX(-50%) rotateY(0deg) translateZ(0); }
+            }
+            @keyframes turnLeft {
+                from { transform: translateX(-50%) rotateY(0deg) translateZ(0); }
+                to { transform: translateX(-50%) rotateY(180deg) translateZ(0); }
+            }
         }
     </style>
 </head>
@@ -430,6 +438,12 @@
         <source src="https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/zhongkui.mp3" type="audio/mpeg">
         Your browser does not support the audio element.
     </audio>
+    <script>
+        // Disable right-click context menu
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
+    </script>
     <script defer src="game.js"></script>
 </body>
 </html>
