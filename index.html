@@ -30,6 +30,7 @@
             padding: 20px;
             border-radius: 10px;
             z-index: 10;
+			animation: glow 1s ease-in-out infinite alternate;
         }
         #start-button {
             padding: 15px 30px;
@@ -39,6 +40,7 @@
             cursor: pointer;
             margin-top: 20px;
             background-color: #fff;
+			animation: glow 1s ease-in-out infinite alternate;
         }
         #start-button:hover {
             background-color: #ddd;
@@ -58,6 +60,8 @@
             overflow: hidden;
             z-index: 5;
             display: none;
+            animation: glow 1s ease-in-out infinite alternate;
+            box-shadow: 0 0 10px yellow;
         }
         #character {
             position: absolute;
@@ -132,6 +136,10 @@
         .glow {
             animation: glow 0.3s ease-out;
         }
+        @keyframes fadeInScale {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        }
         #score, #life, #level {
             position: absolute;
             font-family: Arial, sans-serif;
@@ -151,20 +159,48 @@
             left: 50%;
             transform: translate(-50%, -50%);
             font-family: Arial, sans-serif;
-            font-size: 32px;
+            font-size: 28px;
             color: red;
             background-color: rgba(255, 255, 255, 0.9);
-            padding: 15px 20px;
+            padding: 20px;
             border-radius: 10px;
             display: none;
             text-align: center;
-            cursor: pointer;
             z-index: 10;
             max-width: 90%;
-            display: flex;
             flex-direction: column;
-            gap: 8px;
-            line-height: 1.2;
+            gap: 10px;
+            line-height: 1.3;
+            animation: fadeInScale 0.3s ease-out;
+            box-shadow: 0 0 10px yellow;
+            animation: glow 1s ease-in-out infinite alternate;
+        }
+        #game-over button {
+            padding: 10px 20px;
+            font-size: 18px;
+            border: 1px solid #333;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: rgba(255, 215, 0, 0.9);
+            color: #333;
+            margin-top: 10px;
+            transition: transform 0.2s ease;
+        }
+        #game-over button:hover {
+            transform: scale(1.05);
+        }
+        #game-over button:active {
+            transform: scale(0.95);
+        }
+        #game-over-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 9;
+            display: none;
         }
         #controls, #restart-container {
             position: relative;
@@ -183,12 +219,85 @@
             cursor: pointer;
             touch-action: manipulation;
             background-color: rgba(255, 255, 255, 0.9);
+			animation: glow 1s ease-in-out infinite alternate;
         }
         #left-button:hover, #jump-button:hover, #right-button:hover, #restart-button:hover {
             background-color: #ddd;
         }
         #left-button:active, #jump-button:active, #right-button:active, #restart-button:active {
             background-color: #bbb;
+        }
+        #address-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 10px;
+            gap: 10px;
+            font-family: Arial, sans-serif;
+            font-size: 18px;
+            color: #ffd700;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px 15px;
+            border-radius: 5px;
+            z-index: 8;
+            text-shadow: 0 0 5px #ff4500;
+            animation: glow 1s ease-in-out infinite alternate;
+        }
+        #address-text {
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        #copy-button {
+            padding: 8px 15px;
+            font-size: 16px;
+            border: 1px solid #ffd700;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: rgba(255, 215, 0, 0.9);
+            color: #333;
+        }
+        #copy-button:hover {
+            background-color: rgba(255, 215, 0, 0.7);
+        }
+        #copy-button:active {
+            background-color: rgba(255, 215, 0, 0.5);
+        }
+        .copy-toast {
+            position: absolute;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: #ffd700;
+            font-family: Arial, sans-serif;
+            font-size: 16px;
+            padding: 8px 16px;
+            border-radius: 5px;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+            z-index: 9;
+            text-shadow: 0 0 5px #ff4500;
+        }
+        .copy-toast.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        @media (max-width: 600px) {
+            #game-over {
+                font-size: 20px;
+                padding: 15px;
+                gap: 8px;
+            }
+            #game-over button {
+                font-size: 16px;
+                padding: 8px 16px;
+            }
+            .copy-toast {
+                bottom: 80px;
+                font-size: 14px;
+                padding: 6px 12px;
+            }
         }
     </style>
 </head>
@@ -202,13 +311,15 @@
         <div id="score">得分: 0 | 最高分: 0</div>
         <div id="life">生命: 5</div>
         <div id="level">等级: 1</div>
+        <div id="game-over-overlay"></div>
         <div id="game-over" tabindex="0" role="alert">
             <div>游戏结束！</div>
-            <div>等级: 1</div>
-            <div>得分: 0</div>
-            <div>最高分: 0</div>
-            <div>生命: 5</div>
-            <div>点击或按 Enter 重新开始</div>
+            <div id="game-over-level">等级: 1</div>
+            <div id="game-over-score">得分: 0</div>
+            <div id="game-over-high-score">最高分: 0</div>
+            <div id="game-over-life">生命: 5</div>
+            <div>再试一次，挑战更高分数！</div>
+            <button id="game-over-restart" aria-label="重新开始游戏">重新开始</button>
         </div>
     </div>
     <div id="controls">
@@ -219,6 +330,11 @@
     <div id="restart-container">
         <button id="restart-button" aria-label="重新开始游戏">重新开始</button>
     </div>
+    <div id="address-container">
+        <span id="address-text">0xead5dcadb47aacc9e051a8c1462d6175be72df69</span>
+        <button id="copy-button" aria-label="复制地址">复制</button>
+    </div>
+    <div id="copy-toast" class="copy-toast">地址已复制！</div>
     <audio id="bg-music" loop preload="auto">
         <source src="https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/zhongkui.mp3" type="audio/mpeg">
         Your browser does not support the audio element.
