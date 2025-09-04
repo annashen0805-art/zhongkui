@@ -10,11 +10,15 @@ const scoreDisplay = document.getElementById('score');
 const lifeDisplay = document.getElementById('life');
 const levelDisplay = document.getElementById('level');
 const gameOverDisplay = document.getElementById('game-over');
+const gameOverOverlay = document.getElementById('game-over-overlay');
 const leftButton = document.getElementById('left-button');
 const jumpButton = document.getElementById('jump-button');
 const rightButton = document.getElementById('right-button');
 const restartButton = document.getElementById('restart-button');
 const bgMusic = document.getElementById('bg-music');
+const addressContainer = document.getElementById('address-container');
+const addressText = document.getElementById('address-text');
+const copyButton = document.getElementById('copy-button');
 
 // Validate critical DOM elements
 const missingElements = [];
@@ -26,6 +30,10 @@ if (!scoreDisplay) missingElements.push('score');
 if (!lifeDisplay) missingElements.push('life');
 if (!levelDisplay) missingElements.push('level');
 if (!gameOverDisplay) missingElements.push('game-over');
+if (!gameOverOverlay) missingElements.push('game-over-overlay');
+if (!addressContainer) missingElements.push('address-container');
+if (!addressText) missingElements.push('address-text');
+if (!copyButton) missingElements.push('copy-button');
 if (missingElements.length > 0) {
     console.error(`Missing DOM elements: ${missingElements.join(', ')}`);
     document.body.innerHTML = `<div style="color: red; text-align: center; padding: 20px;">
@@ -33,6 +41,34 @@ if (missingElements.length > 0) {
     </div>`;
     throw new Error(`Missing DOM elements: ${missingElements.join(', ')}`);
 }
+
+// Add copy button functionality
+copyButton.addEventListener('click', () => {
+    try {
+        const text = addressText.textContent.replace('Unlock Power: ', '');
+        navigator.clipboard.writeText(text).then(() => {
+            copyButton.textContent = '已复制!';
+            copyButton.style.backgroundColor = 'rgba(50, 205, 50, 0.9)';
+            const toast = document.getElementById('copy-toast');
+            if (toast) {
+                toast.classList.add('show');
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                }, 2000);
+            }
+            setTimeout(() => {
+                copyButton.textContent = '复制';
+                copyButton.style.backgroundColor = 'rgba(255, 215, 0, 0.9)';
+            }, 2000);
+        }).catch(err => {
+            console.error('复制失败:', err);
+            showError('无法复制地址，请手动复制。');
+        });
+    } catch (error) {
+        console.error('Copy button error:', error);
+        showError('复制功能出错，请手动复制地址。');
+    }
+});
 
 const isMobile = /Mobi|Android/i.test(navigator.userAgent);
 const gameConfig = {
@@ -73,7 +109,7 @@ let gameAreaRect = null;
 let cachedCharacterRect = null;
 let lastBackgroundUpdateLife = life;
 
-// Fallback base64 images (replace with actual base64 strings)
+// Fallback base64 images
 const fallbackCharacterImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGURgAAAABJRU5ErkJggg==';
 const fallbackCoinImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHogJ/PdX9BAAAAABJRU5ErkJggg==';
 
@@ -130,6 +166,7 @@ function startGame() {
         gameArea.style.display = 'block';
         controls.style.display = 'flex';
         restartContainer.style.display = 'flex';
+        addressContainer.style.display = 'flex';
         bgMusic.play().catch(error => {
             console.error('背景音乐播放失败:', error);
         });
@@ -146,12 +183,12 @@ startButton.addEventListener('click', startGame);
 function jump() {
     if (!isJumping && !isGameOver) {
         isJumping = true;
-        cachedCharacterRect = null; // Invalidate cache on jump
+        cachedCharacterRect = null;
         character.style.transform = `translateX(-50%) translateY(${currentConfig.jumpHeight}) scaleX(${isFacingRight ? 1 : -1}) translateZ(0)`;
         setTimeout(() => {
             character.style.transform = `translateX(-50%) translateY(0) scaleX(${isFacingRight ? 1 : -1}) translateZ(0)`;
             isJumping = false;
-            cachedCharacterRect = null; // Invalidate cache after jump
+            cachedCharacterRect = null;
         }, 300);
     }
 }
@@ -162,7 +199,7 @@ function updateCharacterPosition() {
         character.style.left = `${characterX}%`;
         isFacingRight = moveDirection > 0;
         character.style.transform = `translateX(-50%) scaleX(${isFacingRight ? 1 : -1})${isJumping ? ` translateY(${currentConfig.jumpHeight})` : ''} translateZ(0)`;
-        cachedCharacterRect = null; // Invalidate cache on movement
+        cachedCharacterRect = null;
     }
 }
 
@@ -269,7 +306,8 @@ restartButton.addEventListener('click', () => {
     restartGame();
 });
 
-gameOverDisplay.addEventListener('click', () => {
+gameOverDisplay.addEventListener('click', (e) => {
+    if (e.target.id !== 'game-over-restart') return;
     restartGame();
 });
 
@@ -283,9 +321,10 @@ function showError(message) {
     gameOverDisplay.innerHTML = `
         <div>错误！</div>
         <div>${message}</div>
-        <div>点击或按 Enter 重新开始</div>
+        <button id="game-over-restart" aria-label="重新开始游戏">重新开始</button>
     `;
     gameOverDisplay.style.display = 'flex';
+    gameOverOverlay.style.display = 'block';
     isGameOver = true;
     bgMusic.pause();
 }
@@ -306,13 +345,16 @@ function restartGame() {
         if (lifeDisplay) lifeDisplay.textContent = `生命: ${life}`;
         if (levelDisplay) levelDisplay.textContent = `等级: ${level}`;
         gameOverDisplay.style.display = 'none';
+        gameOverOverlay.style.display = 'none';
+        addressContainer.style.display = 'flex';
         gameOverDisplay.innerHTML = `
             <div>游戏结束！</div>
-            <div>等级: ${level}</div>
-            <div>得分: ${score}</div>
-            <div>最高分: ${highScore}</div>
-            <div>生命: ${life}</div>
-            <div>点击或按 Enter 重新开始</div>
+            <div id="game-over-level">等级: ${level}</div>
+            <div id="game-over-score">得分: ${score}</div>
+            <div id="game-over-high-score">最高分: ${highScore}</div>
+            <div id="game-over-life">生命: ${life}</div>
+            <div>再试一次，挑战更高分数！</div>
+            <button id="game-over-restart" aria-label="重新开始游戏">重新开始</button>
         `;
         coins.forEach(coin => {
             if (coin.parentNode) {
@@ -445,6 +487,7 @@ function spawnCoin() {
         console.error('Failed to spawn coin:', error);
     }
 }
+
 function collectCoin(coin) {
     try {
         score += 10;
@@ -522,13 +565,16 @@ function gameOver() {
         isGameOver = true;
         gameOverDisplay.innerHTML = `
             <div>游戏结束！</div>
-            <div>等级: ${level}</div>
-            <div>得分: ${score}</div>
-            <div>最高分: ${highScore}</div>
-            <div>生命: ${life}</div>
-            <div>点击或按 Enter 重新开始</div>
+            <div id="game-over-level">等级: ${level}</div>
+            <div id="game-over-score">得分: ${score}</div>
+            <div id="game-over-high-score">最高分: ${highScore}</div>
+            <div id="game-over-life">生命: ${life}</div>
+            <div>再试一次，挑战更高分数！</div>
+            <button id="game-over-restart" aria-label="重新开始游戏">重新开始</button>
         `;
         gameOverDisplay.style.display = 'flex';
+        gameOverOverlay.style.display = 'block';
+        addressContainer.style.display = 'flex';
         coins.forEach(coin => {
             if (coin.parentNode) {
                 coin.cleanup();
@@ -589,6 +635,7 @@ document.addEventListener('visibilitychange', () => {
             cachedCharacterRect = null;
             updateGameAreaRect();
             updateCoinSpeed();
+            addressContainer.style.display = 'flex';
             requestAnimationFrame(gameLoop);
             bgMusic.play().catch(error => {
                 console.error('Background music failed to play:', error);
@@ -602,18 +649,23 @@ document.addEventListener('visibilitychange', () => {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM content loaded');
     try {
-        // Re-query elements in case they were loaded late
         const scoreDisplay = document.getElementById('score');
         const lifeDisplay = document.getElementById('life');
         const levelDisplay = document.getElementById('level');
+        const addressContainer = document.getElementById('address-container');
+        const addressText = document.getElementById('address-text');
+        const copyButton = document.getElementById('copy-button');
+        const gameOverOverlay = document.getElementById('game-over-overlay');
         const missingElements = [];
         if (!scoreDisplay) missingElements.push('score');
         if (!lifeDisplay) missingElements.push('life');
         if (!levelDisplay) missingElements.push('level');
+        if (!addressContainer) missingElements.push('address-container');
+        if (!addressText) missingElements.push('address-text');
+        if (!copyButton) missingElements.push('copy-button');
+        if (!gameOverOverlay) missingElements.push('game-over-overlay');
         if (missingElements.length > 0) {
             console.error(`Missing DOM elements during initialization: ${missingElements.join(', ')}`);
-            // Fallback: Show start screen and allow game to proceed
-            startScreen.style.display = 'block';
             document.body.innerHTML += `<div style="color: red; text-align: center; padding: 10px;">
                 警告：缺少元素 (${missingElements.join(', ')})。游戏可能不完整。
             </div>`;
@@ -621,6 +673,7 @@ document.addEventListener('DOMContentLoaded', () => {
             scoreDisplay.textContent = `得分: ${score} | 最高分: ${highScore}`;
             lifeDisplay.textContent = `生命: ${life}`;
             levelDisplay.textContent = `等级: ${level}`;
+            addressContainer.style.display = 'none';
         }
         startScreen.style.display = 'block';
         console.log('Initial game state set');
