@@ -113,8 +113,8 @@
             bottom: 0;
             left: 50%;
             transform: translateX(-50%) scaleX(1) translateZ(0);
-            width: 150px;
-            max-width: 150px;
+            width: 180px;
+            max-width: 180px;
             height: 120px;
             max-height: 120px;
             background-image: url('https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/characters.png');
@@ -374,14 +374,6 @@
                 0% { box-shadow: 0 0 5px yellow; }
                 100% { box-shadow: 0 0 0 transparent; }
             }
-            @keyframes turnRight {
-                from { transform: translateX(-50%) rotateY(180deg) translateZ(0); }
-                to { transform: translateX(-50%) rotateY(0deg) translateZ(0); }
-            }
-            @keyframes turnLeft {
-                from { transform: translateX(-50%) rotateY(0deg) translateZ(0); }
-                to { transform: translateX(-50%) rotateY(180deg) translateZ(0); }
-            }
         }
     </style>
 </head>
@@ -418,7 +410,7 @@
             <div id="game-over-high-score">最高分: 0</div>
             <div id="game-over-life">生命: 5</div>
             <div>再试一次，挑战更高分数！</div>
-            <button id="game-over-restart" aria-label="重新开始游戏">重新开始</button>
+            <button id="game-over-restart" ariaa-label="重新开始游戏">重新开始</button>
         </div>
     </div>
     <div id="controls">
@@ -438,12 +430,6 @@
         <source src="https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/zhongkui.mp3" type="audio/mpeg">
         Your browser does not support the audio element.
     </audio>
-    <script>
-        // Disable right-click context menu
-        document.addEventListener('contextmenu', function(e) {
-            e.preventDefault();
-        });
-    </script>
     <script defer src="game.js"></script>
 </body>
 </html>
