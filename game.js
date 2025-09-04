@@ -61,11 +61,11 @@ copyButton.addEventListener('click', () => {
                 copyButton.style.backgroundColor = 'rgba(255, 215, 0, 0.9)';
             }, 2000);
         }).catch(err => {
-            console.error('复制失败:', err);
+            console.error('复制失败:', err, err.stack);
             showError('无法复制地址，请手动复制。');
         });
     } catch (error) {
-        console.error('Copy button error:', error);
+        console.error('Copy button error:', error, error.stack);
         showError('复制功能出错，请手动复制地址。');
     }
 });
@@ -82,7 +82,8 @@ const gameConfig = {
         initialFallDuration: 6,
         fallDurationDecrease: 0.3,
         minFallDuration: 2,
-        maxCoins: (level) => isMobile ? Math.min(5, Math.floor(level / 2) + 3) : Math.min(10, Math.floor(level / 2) + 5),
+        // Reduced max coins for mobile to improve performance
+        maxCoins: (level) => isMobile ? Math.min(3, Math.floor(level / 2) + 2) : Math.min(6, Math.floor(level / 2) + 4),
     },
 };
 
@@ -101,7 +102,8 @@ let isFacingRight = true;
 let moveDirection = 0;
 let lastCollisionCheck = 0;
 let lastFrameTime = 0;
-const collisionCheckInterval = 200;
+// Increased collision check interval for better performance
+const collisionCheckInterval = 250;
 const coins = [];
 const explosionPool = [];
 const maxExplosionPoolSize = 10;
@@ -148,7 +150,7 @@ function updateGameAreaRect() {
     try {
         gameAreaRect = gameArea.getBoundingClientRect();
     } catch (error) {
-        console.error('Failed to update game area rect:', error);
+        console.error('Failed to update game area rect:', error, error.stack);
     }
 }
 
@@ -168,12 +170,12 @@ function startGame() {
         restartContainer.style.display = 'flex';
         addressContainer.style.display = 'flex';
         bgMusic.play().catch(error => {
-            console.error('背景音乐播放失败:', error);
+            console.error('背景音乐播放失败:', error, error.stack);
         });
         restartGame();
         console.log('Game started, game area should be visible');
     } catch (error) {
-        console.error('Failed to start game:', error);
+        console.error('Failed to start game:', error, error.stack);
         showError('无法启动游戏，请刷新页面重试。');
     }
 }
@@ -229,7 +231,7 @@ leftButton.addEventListener('mousedown', (e) => {
     if (!isGameOver) moveDirection = -1;
 });
 leftButton.addEventListener('touchstart', (e) => {
-    e.preventDefault();
+    if (!isGameOver) e.preventDefault();
     if (!isGameOver) moveDirection = -1;
 });
 leftButton.addEventListener('mouseup', () => {
@@ -248,7 +250,7 @@ rightButton.addEventListener('mousedown', (e) => {
     if (!isGameOver) moveDirection = 1;
 });
 rightButton.addEventListener('touchstart', (e) => {
-    e.preventDefault();
+    if (!isGameOver) e.preventDefault();
     if (!isGameOver) moveDirection = 1;
 });
 rightButton.addEventListener('mouseup', () => {
@@ -270,16 +272,21 @@ jumpButton.addEventListener('click', (e) => {
 let touchStartX = 0;
 let lastTouchMove = 0;
 let hasSwiped = false;
-const touchMoveThrottle = 50;
+// Increased throttle to reduce touch event frequency
+const touchMoveThrottle = 100;
 gameArea.addEventListener('touchstart', (e) => {
-    e.preventDefault();
+    console.log('Touchstart detected at:', performance.now());
+    if (!isGameOver) e.preventDefault();
     touchStartX = e.touches[0].clientX;
     hasSwiped = false;
-});
+}, { passive: false });
 
 gameArea.addEventListener('touchmove', (e) => {
-    e.preventDefault();
-    if (e.touches.length > 1) return;
+    if (!isGameOver) e.preventDefault();
+    if (e.touches.length > 1) {
+        console.log('Multi-touch detected, ignoring');
+        return;
+    }
     if (performance.now() - lastTouchMove < touchMoveThrottle) return;
     lastTouchMove = performance.now();
     let touchEndX = e.touches[0].clientX;
@@ -291,11 +298,14 @@ gameArea.addEventListener('touchmove', (e) => {
 }, { passive: false });
 
 gameArea.addEventListener('touchend', (e) => {
-    e.preventDefault();
-    moveDirection = 0;
-    if (!hasSwiped) jump();
-    hasSwiped = false;
-});
+    if (!isGameOver) e.preventDefault();
+    // Added delay to handle touch latency
+    setTimeout(() => {
+        moveDirection = 0;
+        if (!hasSwiped) jump();
+        hasSwiped = false;
+    }, 50);
+}, { passive: false });
 
 character.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -318,15 +328,19 @@ gameOverDisplay.addEventListener('keydown', (e) => {
 });
 
 function showError(message) {
-    gameOverDisplay.innerHTML = `
-        <div>错误！</div>
-        <div>${message}</div>
-        <button id="game-over-restart" aria-label="重新开始游戏">重新开始</button>
-    `;
-    gameOverDisplay.style.display = 'flex';
-    gameOverOverlay.style.display = 'block';
-    isGameOver = true;
-    bgMusic.pause();
+    try {
+        gameOverDisplay.innerHTML = `
+            <div>错误！</div>
+            <div>${message}</div>
+            <button id="game-over-restart" aria-label="重新开始游戏">重新开始</button>
+        `;
+        gameOverDisplay.style.display = 'flex';
+        gameOverOverlay.style.display = 'block';
+        isGameOver = true;
+        bgMusic.pause();
+    } catch (error) {
+        console.error('Failed to show error:', error, error.stack);
+    }
 }
 
 function restartGame() {
@@ -356,6 +370,7 @@ function restartGame() {
             <div>再试一次，挑战更高分数！</div>
             <button id="game-over-restart" aria-label="重新开始游戏">重新开始</button>
         `;
+        console.log('Coins before cleanup:', coins.length, 'coinCount:', coinCount);
         coins.forEach(coin => {
             if (coin.parentNode) {
                 coin.cleanup();
@@ -364,8 +379,9 @@ function restartGame() {
         });
         coins.length = 0;
         coinCount = 0;
+        console.log('Coins after cleanup:', coins.length, 'coinCount:', coinCount);
         cachedCharacterRect = null;
-        const initialCoinCount = Math.floor(Math.random() * 5) + 1;
+        const initialCoinCount = Math.floor(Math.random() * 3) + 1; // Reduced initial coins
         for (let i = 0; i < initialCoinCount; i++) {
             spawnCoin();
         }
@@ -380,16 +396,17 @@ function restartGame() {
         restartContainer.style.display = 'flex';
         requestAnimationFrame(gameLoop);
         bgMusic.play().catch(error => {
-            console.error('背景音乐播放失败:', error);
+            console.error('背景音乐播放失败:', error, error.stack);
         });
     } catch (error) {
-        console.error('Failed to restart game:', error);
+        console.error('Failed to restart game:', error, error.stack);
         showError('无法重启游戏，请刷新页面重试。');
     }
 }
 
 function getExplosion() {
     try {
+        console.log('Explosion pool size:', explosionPool.length);
         let explosion = explosionPool.find(e => !e.parentNode);
         if (!explosion) {
             if (explosionPool.length >= maxExplosionPoolSize) {
@@ -401,11 +418,14 @@ function getExplosion() {
             explosionPool.push(explosion);
         }
         explosion.addEventListener('animationend', () => {
-            if (explosion.parentNode) explosion.remove();
+            if (explosion.parentNode) {
+                explosion.remove();
+                console.log('Explosion removed');
+            }
         });
         return explosion;
     } catch (error) {
-        console.error('Failed to create explosion:', error);
+        console.error('Failed to create explosion:', error, error.stack);
         return null;
     }
 }
@@ -420,7 +440,7 @@ function updateCoinSpeed() {
             coin.style.setProperty('--fall-duration', `${fallDuration}s`);
         });
     } catch (error) {
-        console.error('Failed to update coin speed:', error);
+        console.error('Failed to update coin speed:', error, error.stack);
     }
 }
 
@@ -478,13 +498,17 @@ function spawnCoin() {
         coin.addEventListener('animationend', handleAnimationEnd);
         coin.addEventListener('click', handleClick);
         coin.cleanup = () => {
-            coin.removeEventListener('animationend', handleAnimationEnd);
-            coin.removeEventListener('click', handleClick);
-            coin.onerror = null;
-            coin.style.animation = 'none';
+            try {
+                coin.removeEventListener('animationend', handleAnimationEnd);
+                coin.removeEventListener('click', handleClick);
+                coin.onerror = null;
+                coin.style.animation = 'none';
+            } catch (error) {
+                console.error('Failed to clean up coin:', error, error.stack);
+            }
         };
     } catch (error) {
-        console.error('Failed to spawn coin:', error);
+        console.error('Failed to spawn coin:', error, error.stack);
     }
 }
 
@@ -510,11 +534,18 @@ function collectCoin(coin) {
             gameArea.appendChild(explosion);
         }
 
-        character.classList.add('glow');
-        setTimeout(() => {
-            if (explosion && explosion.parentNode) explosion.remove();
-            character.classList.remove('glow');
-        }, 600);
+        // Disable glow animation on mobile for performance
+        if (!isMobile) {
+            character.classList.add('glow');
+            setTimeout(() => {
+                if (explosion && explosion.parentNode) explosion.remove();
+                character.classList.remove('glow');
+            }, 500); // Reduced duration to match simplified explode animation
+        } else {
+            setTimeout(() => {
+                if (explosion && explosion.parentNode) explosion.remove();
+            }, 500);
+        }
 
         if (coin.parentNode) {
             coin.cleanup();
@@ -523,7 +554,7 @@ function collectCoin(coin) {
             coinCount--;
         }
     } catch (error) {
-        console.error('Failed to collect coin:', error);
+        console.error('Failed to collect coin:', error, error.stack);
     }
 }
 
@@ -556,13 +587,14 @@ function checkCollisions() {
         });
         coinsToRemove.forEach(coin => collectCoin(coin));
     } catch (error) {
-        console.error('Failed to check collisions:', error);
+        console.error('Failed to check collisions:', error, error.stack);
     }
 }
 
 function gameOver() {
     try {
         isGameOver = true;
+        console.log('Game over, coins:', coins.length, 'coinCount:', coinCount);
         gameOverDisplay.innerHTML = `
             <div>游戏结束！</div>
             <div id="game-over-level">等级: ${level}</div>
@@ -583,9 +615,10 @@ function gameOver() {
         });
         coins.length = 0;
         coinCount = 0;
+        console.log('Coins after game over cleanup:', coins.length, 'coinCount:', coinCount);
         bgMusic.pause();
     } catch (error) {
-        console.error('Failed to end game:', error);
+        console.error('Failed to end game:', error, error.stack);
         showError('游戏结束失败，请刷新页面重试。');
     }
 }
@@ -607,10 +640,15 @@ function gameLoop(timestamp) {
             lastFrameTime = timestamp;
             const duration = performance.now() - start;
             if (duration > 16) {
-                console.warn(`Slow frame: ${duration.toFixed(2)}ms, coins: ${coinCount}, level: ${level}`);
+                console.warn(`Slow frame: ${duration.toFixed(2)}ms, coins: ${coinCount}, level: ${level}, collision: ${timestamp - lastCollisionCheck}ms, spawn: ${timestamp - lastSpawnTime}ms`);
+                // Pause coin spawning on slow frames
+                if (duration > 50) {
+                    console.warn('Pausing coin spawn due to slow frame');
+                    lastSpawnTime += 500;
+                }
             }
         } catch (error) {
-            console.error('Game loop error:', error);
+            console.error('Game loop error:', error, error.stack);
             showError('游戏循环错误，请刷新页面重试。');
         }
     }
@@ -636,13 +674,15 @@ document.addEventListener('visibilitychange', () => {
             updateGameAreaRect();
             updateCoinSpeed();
             addressContainer.style.display = 'flex';
+            console.log('Resuming game, state reset');
             requestAnimationFrame(gameLoop);
             bgMusic.play().catch(error => {
-                console.error('Background music failed to play:', error);
+                console.error('Background music failed to play:', error, error.stack);
             });
         }
     } catch (error) {
-        console.error('Failed to handle visibility change:', error);
+        console.error('Failed to handle visibility change:', error, error.stack);
+        showError('页面可见性切换失败，请刷新页面重试。');
     }
 });
 
@@ -678,7 +718,7 @@ document.addEventListener('DOMContentLoaded', () => {
         startScreen.style.display = 'block';
         console.log('Initial game state set');
     } catch (error) {
-        console.error('Failed to initialize game state:', error);
+        console.error('Failed to initialize game state:', error, error.stack);
         showError('游戏初始化失败，请检查页面元素并刷新重试。');
     }
 });
