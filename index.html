@@ -48,6 +48,51 @@
         #start-button:active {
             background-color: #bbb;
         }
+        #character-selection {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 10;
+            display: none;
+        }
+        #character-selection > div {
+            font-family: Arial, sans-serif;
+            font-size: 28px;
+            color: #333;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            animation: glow 1s ease-in-out infinite alternate;
+        }
+        .character-option {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+        #character-options {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .select-character-button {
+            padding: 10px 20px;
+            font-size: 18px;
+            border: 1px solid #333;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: rgba(255, 255, 255, 0.9);
+            animation: glow 1s ease-in-out infinite alternate;
+        }
+        .select-character-button:hover {
+            background-color: #ddd;
+        }
+        .select-character-button:active {
+            background-color: #bbb;
+        }
         #game-area {
             position: relative;
             width: 80%;
@@ -107,7 +152,6 @@
                 rgba(0, 0, 0, 0) 100%
             );
             border-radius: 50%;
-            /* Simplified explode animation for better performance */
             animation: explode 0.5s ease-out forwards;
             pointer-events: none;
             z-index: 7;
@@ -121,7 +165,6 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        /* Simplified explode animation to reduce rendering load */
         @keyframes explode {
             0% { transform: scale(1); opacity: 1; }
             100% { transform: scale(3); opacity: 0; }
@@ -315,7 +358,18 @@
                 padding: 6px 10px;
                 font-size: 14px;
             }
-            /* Reduce glow animation intensity on mobile for performance */
+            #character-selection {
+                font-size: 20px;
+                padding: 15px;
+            }
+            .character-option img {
+                width: 80px;
+                height: 80px;
+            }
+            .select-character-button {
+                font-size: 16px;
+                padding: 8px 16px;
+            }
             @keyframes glow {
                 0% { box-shadow: 0 0 5px yellow; }
                 100% { box-shadow: 0 0 0 transparent; }
@@ -327,6 +381,21 @@
     <div id="start-screen">
         <div>欢迎体验钟馗游戏！</div>
         <button id="start-button" aria-label="开始游戏">开始游戏</button>
+    </div>
+    <div id="character-selection">
+        <div>
+            <div>请选择您的角色</div>
+            <div id="character-options">
+                <div class="character-option">
+                    <img src="https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/characters.png" alt="角色1" style="width: 100px; height: 100px; object-fit: contain;">
+                    <button class="select-character-button" data-character="https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/characters.png" aria-label="选择角色1">选择角色1</button>
+                </div>
+                <div class="character-option">
+                    <img src="https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/characters2.png" alt="角色2" style="width: 100px; height: 100px; object-fit: contain;">
+                    <button class="select-character-button" data-character="https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/characters2.png" aria-label="选择角色2">选择角色2</button>
+                </div>
+            </div>
+        </div>
     </div>
     <div id="game-area">
         <div id="character" aria-label="可移动的游戏角色"></div>
