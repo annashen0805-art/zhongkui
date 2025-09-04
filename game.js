@@ -45,8 +45,8 @@ if (missingElements.length > 0) {
 // Add copy button functionality
 copyButton.addEventListener('click', () => {
     try {
-        const text = addressText.textContent.replace('Unlock Power: ', '');
-        navigator.clipboard.writeText(text).then(() => {
+        const fullAddress = addressText.dataset.fullAddress || addressText.textContent;
+        navigator.clipboard.writeText(fullAddress).then(() => {
             copyButton.textContent = '已复制!';
             copyButton.style.backgroundColor = 'rgba(50, 205, 50, 0.9)';
             const toast = document.getElementById('copy-toast');
