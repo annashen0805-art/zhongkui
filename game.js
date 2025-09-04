@@ -38,9 +38,7 @@ if (!addressText) missingElements.push('address-text');
 if (!copyButton) missingElements.push('copy-button');
 if (missingElements.length > 0) {
     console.error(`Missing DOM elements: ${missingElements.join(', ')}`);
-    document.body.innerHTML = `<div style="color: red; text-align: center; padding: 20px;">
-        错误：无法找到必要的页面元素 (${missingElements.join(', ')})。请检查HTML结构并刷新页面。
-    </div>`;
+    document.body.innerHTML = `<div style="color: red; text-align: center; padding: 20px;">错误：无法找到必要的页面元素 (${missingElements.join(', ')})。请检查HTML结构并刷新页面。</div>`;
     throw new Error(`Missing DOM elements: ${missingElements.join(', ')}`);
 }
 
@@ -103,6 +101,8 @@ let isFacingRight = true;
 let moveDirection = 0;
 let lastCollisionCheck = 0;
 let lastFrameTime = 0;
+let lastTurnTime = 0; // For turning cooldown
+const turnCooldown = 300; // 500ms cooldown for turning
 const collisionCheckInterval = 250;
 const coins = [];
 const explosionPool = [];
@@ -110,7 +110,7 @@ const maxExplosionPoolSize = 10;
 let gameAreaRect = null;
 let cachedCharacterRect = null;
 let lastBackgroundUpdateLife = life;
-let selectedCharacterImage = 'https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/characters.png'; // Default character
+let selectedCharacterImage = 'https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/characters.png';
 
 // Fallback base64 images
 const fallbackCharacterImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGURgAAAABJRU5ErkJggg==';
@@ -142,6 +142,7 @@ preloadImages.forEach(src => {
         }
     };
 });
+
 bgMusic.load();
 bgMusic.volume = 0.3;
 bgMusic.onerror = () => {
@@ -213,9 +214,11 @@ function jump() {
     if (!isJumping && !isGameOver) {
         isJumping = true;
         cachedCharacterRect = null;
-        character.style.transform = `translateX(-50%) translateY(${currentConfig.jumpHeight}) scaleX(${isFacingRight ? 1 : -1}) translateZ(0)`;
+        character.classList.add('jumping');
+        character.style.transform = `translateX(-50%) rotateY(${isFacingRight ? 0 : 180}deg) translateY(${currentConfig.jumpHeight}) translateZ(0)`;
         setTimeout(() => {
-            character.style.transform = `translateX(-50%) translateY(0) scaleX(${isFacingRight ? 1 : -1}) translateZ(0)`;
+            character.style.transform = `translateX(-50%) rotateY(${isFacingRight ? 0 : 180}deg) translateY(0) translateZ(0)`;
+            character.classList.remove('jumping');
             isJumping = false;
             cachedCharacterRect = null;
         }, 300);
@@ -226,8 +229,32 @@ function updateCharacterPosition() {
     if (!isGameOver && moveDirection !== 0) {
         characterX = Math.max(9, Math.min(91, characterX + moveDirection * currentConfig.moveSpeed));
         character.style.left = `${characterX}%`;
-        isFacingRight = moveDirection > 0;
-        character.style.transform = `translateX(-50%) scaleX(${isFacingRight ? 1 : -1})${isJumping ? ` translateY(${currentConfig.jumpHeight})` : ''} translateZ(0)`;
+
+        const currentTime = performance.now();
+        // Handle direction change with cooldown
+        if (moveDirection > 0 && !isFacingRight && currentTime - lastTurnTime >= turnCooldown) {
+            // Turning right
+            character.style.animation = 'turnRight 0.3s ease forwards';
+            isFacingRight = true;
+            lastTurnTime = currentTime;
+            setTimeout(() => {
+                character.style.animation = 'none';
+                character.style.transform = `translateX(-50%) rotateY(0deg) translateZ(0)${isJumping ? ` translateY(${currentConfig.jumpHeight})` : ''}`;
+            }, 300);
+        } else if (moveDirection < 0 && isFacingRight && currentTime - lastTurnTime >= turnCooldown) {
+            // Turning left
+            character.style.animation = 'turnLeft 0.3s ease forwards';
+            isFacingRight = false;
+            lastTurnTime = currentTime;
+            setTimeout(() => {
+                character.style.animation = 'none';
+                character.style.transform = `translateX(-50%) rotateY(180deg) translateZ(0)${isJumping ? ` translateY(${currentConfig.jumpHeight})` : ''}`;
+            }, 300);
+        } else {
+            // Maintain current direction
+            character.style.transform = `translateX(-50%) rotateY(${isFacingRight ? 0 : 180}deg) translateZ(0)${isJumping ? ` translateY(${currentConfig.jumpHeight})` : ''}`;
+        }
+
         cachedCharacterRect = null;
     }
 }
@@ -257,17 +284,21 @@ leftButton.addEventListener('mousedown', (e) => {
     e.preventDefault();
     if (!isGameOver) moveDirection = -1;
 });
+
 leftButton.addEventListener('touchstart', (e) => {
     if (!isGameOver) e.preventDefault();
     if (!isGameOver) moveDirection = -1;
 });
+
 leftButton.addEventListener('mouseup', () => {
     moveDirection = 0;
 });
+
 leftButton.addEventListener('touchend', (e) => {
     e.preventDefault();
     moveDirection = 0;
 });
+
 leftButton.addEventListener('mouseleave', () => {
     moveDirection = 0;
 });
@@ -276,17 +307,21 @@ rightButton.addEventListener('mousedown', (e) => {
     e.preventDefault();
     if (!isGameOver) moveDirection = 1;
 });
+
 rightButton.addEventListener('touchstart', (e) => {
     if (!isGameOver) e.preventDefault();
     if (!isGameOver) moveDirection = 1;
 });
+
 rightButton.addEventListener('mouseup', () => {
     moveDirection = 0;
 });
+
 rightButton.addEventListener('touchend', (e) => {
     e.preventDefault();
     moveDirection = 0;
 });
+
 rightButton.addEventListener('mouseleave', () => {
     moveDirection = 0;
 });
@@ -300,6 +335,7 @@ let touchStartX = 0;
 let lastTouchMove = 0;
 let hasSwiped = false;
 const touchMoveThrottle = 100;
+
 gameArea.addEventListener('touchstart', (e) => {
     console.log('Touchstart detected at:', performance.now());
     if (!isGameOver) e.preventDefault();
@@ -378,9 +414,10 @@ function restartGame() {
         characterX = 50;
         isFacingRight = true;
         moveDirection = 0;
+        lastTurnTime = 0; // Reset turn cooldown
         character.style.left = `${characterX}%`;
-        character.style.transform = `translateX(-50%) scaleX(1) translateZ(0)`;
-        character.style.backgroundImage = `url("${selectedCharacterImage}")`; // Preserve selected character
+        character.style.transform = `translateX(-50%) rotateY(0deg) translateZ(0)`;
+        character.style.backgroundImage = `url("${selectedCharacterImage}")`;
         if (scoreDisplay) scoreDisplay.textContent = `得分: ${score} | 最高分: ${highScore}`;
         if (lifeDisplay) lifeDisplay.textContent = `生命: ${life}`;
         if (levelDisplay) levelDisplay.textContent = `等级: ${level}`;
@@ -484,7 +521,7 @@ function spawnCoin() {
             isValidPosition = true;
             coins.forEach(existingCoin => {
                 const existingRect = existingCoin.getBoundingClientRect();
-                if (Math.abs(randomX - (existingRect.left - gameAreaRect.left)) < 80) {
+                if (Math.abs(randomX - (existingRect.left - gameAreaRect.left)) < 100) { // Increased from 80 to 100
                     isValidPosition = false;
                 }
             });
@@ -499,7 +536,6 @@ function spawnCoin() {
         gameArea.appendChild(coin);
         coins.push(coin);
         coinCount++;
-
         coin.onerror = () => {
             coin.style.backgroundImage = `url("${fallbackCoinImage}")`;
             console.warn('Coin image failed to load, using fallback.');
@@ -552,7 +588,6 @@ function collectCoin(coin) {
         localStorage.setItem('highScore', highScore);
         if (scoreDisplay) scoreDisplay.textContent = `得分: ${score} | 最高分: ${highScore}`;
         spawnInterval = Math.max(currentConfig.minSpawnInterval, spawnInterval - currentConfig.spawnIntervalDecrease);
-
         const rect = coin.getBoundingClientRect();
         const explosion = getExplosion();
         if (explosion) {
@@ -589,7 +624,7 @@ function checkCollisions() {
     try {
         if (!cachedCharacterRect) {
             const characterRect = character.getBoundingClientRect();
-            const hitboxPaddingX = characterRect.width * 0.1;
+            const hitboxPaddingX = characterRect.width * 0.15; // Increased from 0.1 to 0.15
             const hitboxPaddingY = characterRect.height * 0.1;
             cachedCharacterRect = {
                 left: characterRect.left + hitboxPaddingX,
@@ -695,6 +730,7 @@ document.addEventListener('visibilitychange', () => {
             lastSpawnTime = performance.now();
             lastCollisionCheck = performance.now();
             lastFrameTime = performance.now();
+            lastTurnTime = performance.now(); // Reset turn cooldown
             cachedCharacterRect = null;
             updateGameAreaRect();
             updateCoinSpeed();
@@ -731,9 +767,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!gameOverOverlay) missingElements.push('game-over-overlay');
         if (missingElements.length > 0) {
             console.error(`Missing DOM elements during initialization: ${missingElements.join(', ')}`);
-            document.body.innerHTML += `<div style="color: red; text-align: center; padding: 10px;">
-                警告：缺少元素 (${missingElements.join(', ')})。游戏可能不完整。
-            </div>`;
+            document.body.innerHTML += `<div style="color: red; text-align: center; padding: 10px;">警告：缺少元素 (${missingElements.join(', ')})。游戏可能不完整。</div>`;
         } else {
             scoreDisplay.textContent = `得分: ${score} | 最高分: ${highScore}`;
             lifeDisplay.textContent = `生命: ${life}`;
