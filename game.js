@@ -2,6 +2,7 @@ console.log('game.js loaded');
 
 const startScreen = document.getElementById('start-screen');
 const startButton = document.getElementById('start-button');
+const characterSelection = document.getElementById('character-selection');
 const gameArea = document.getElementById('game-area');
 const controls = document.getElementById('controls');
 const restartContainer = document.getElementById('restart-container');
@@ -24,6 +25,7 @@ const copyButton = document.getElementById('copy-button');
 const missingElements = [];
 if (!startScreen) missingElements.push('start-screen');
 if (!startButton) missingElements.push('start-button');
+if (!characterSelection) missingElements.push('character-selection');
 if (!gameArea) missingElements.push('game-area');
 if (!character) missingElements.push('character');
 if (!scoreDisplay) missingElements.push('score');
@@ -82,7 +84,6 @@ const gameConfig = {
         initialFallDuration: 6,
         fallDurationDecrease: 0.3,
         minFallDuration: 2,
-        // Reduced max coins for mobile to improve performance
         maxCoins: (level) => isMobile ? Math.min(3, Math.floor(level / 2) + 2) : Math.min(6, Math.floor(level / 2) + 4),
     },
 };
@@ -102,7 +103,6 @@ let isFacingRight = true;
 let moveDirection = 0;
 let lastCollisionCheck = 0;
 let lastFrameTime = 0;
-// Increased collision check interval for better performance
 const collisionCheckInterval = 250;
 const coins = [];
 const explosionPool = [];
@@ -110,6 +110,7 @@ const maxExplosionPoolSize = 10;
 let gameAreaRect = null;
 let cachedCharacterRect = null;
 let lastBackgroundUpdateLife = life;
+let selectedCharacterImage = 'https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/characters.png'; // Default character
 
 // Fallback base64 images
 const fallbackCharacterImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGURgAAAABJRU5ErkJggg==';
@@ -118,6 +119,7 @@ const fallbackCoinImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAA
 // Preload images
 const preloadImages = [
     'https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/characters.png',
+    'https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/characters2.png',
     'https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/coin.png',
     'https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/gameareabackground.jpg',
     'https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/bodybackground.jpg',
@@ -161,19 +163,21 @@ window.addEventListener('resize', () => {
 });
 updateGameAreaRect();
 
+function showCharacterSelection() {
+    try {
+        startScreen.style.display = 'none';
+        characterSelection.style.display = 'block';
+        console.log('Showing character selection screen');
+    } catch (error) {
+        console.error('Failed to show character selection:', error, error.stack);
+        showError('无法显示角色选择界面，请刷新页面重试。');
+    }
+}
+
 function startGame() {
     try {
-        console.log('Starting game...');
-        startScreen.style.display = 'none';
-        gameArea.style.display = 'block';
-        controls.style.display = 'flex';
-        restartContainer.style.display = 'flex';
-        addressContainer.style.display = 'flex';
-        bgMusic.play().catch(error => {
-            console.error('背景音乐播放失败:', error, error.stack);
-        });
-        restartGame();
-        console.log('Game started, game area should be visible');
+        console.log('Starting game, showing character selection...');
+        showCharacterSelection();
     } catch (error) {
         console.error('Failed to start game:', error, error.stack);
         showError('无法启动游戏，请刷新页面重试。');
@@ -181,6 +185,29 @@ function startGame() {
 }
 
 startButton.addEventListener('click', startGame);
+
+// Handle character selection
+document.querySelectorAll('.select-character-button').forEach(button => {
+    button.addEventListener('click', () => {
+        try {
+            selectedCharacterImage = button.dataset.character;
+            character.style.backgroundImage = `url("${selectedCharacterImage}")`;
+            characterSelection.style.display = 'none';
+            gameArea.style.display = 'block';
+            controls.style.display = 'flex';
+            restartContainer.style.display = 'flex';
+            addressContainer.style.display = 'flex';
+            bgMusic.play().catch(error => {
+                console.error('背景音乐播放失败:', error, error.stack);
+            });
+            restartGame();
+            console.log('Character selected, game started');
+        } catch (error) {
+            console.error('Failed to select character:', error, error.stack);
+            showError('角色选择失败，请刷新页面重试。');
+        }
+    });
+});
 
 function jump() {
     if (!isJumping && !isGameOver) {
@@ -272,7 +299,6 @@ jumpButton.addEventListener('click', (e) => {
 let touchStartX = 0;
 let lastTouchMove = 0;
 let hasSwiped = false;
-// Increased throttle to reduce touch event frequency
 const touchMoveThrottle = 100;
 gameArea.addEventListener('touchstart', (e) => {
     console.log('Touchstart detected at:', performance.now());
@@ -299,7 +325,6 @@ gameArea.addEventListener('touchmove', (e) => {
 
 gameArea.addEventListener('touchend', (e) => {
     if (!isGameOver) e.preventDefault();
-    // Added delay to handle touch latency
     setTimeout(() => {
         moveDirection = 0;
         if (!hasSwiped) jump();
@@ -355,6 +380,7 @@ function restartGame() {
         moveDirection = 0;
         character.style.left = `${characterX}%`;
         character.style.transform = `translateX(-50%) scaleX(1) translateZ(0)`;
+        character.style.backgroundImage = `url("${selectedCharacterImage}")`; // Preserve selected character
         if (scoreDisplay) scoreDisplay.textContent = `得分: ${score} | 最高分: ${highScore}`;
         if (lifeDisplay) lifeDisplay.textContent = `生命: ${life}`;
         if (levelDisplay) levelDisplay.textContent = `等级: ${level}`;
@@ -381,7 +407,7 @@ function restartGame() {
         coinCount = 0;
         console.log('Coins after cleanup:', coins.length, 'coinCount:', coinCount);
         cachedCharacterRect = null;
-        const initialCoinCount = Math.floor(Math.random() * 3) + 1; // Reduced initial coins
+        const initialCoinCount = Math.floor(Math.random() * 3) + 1;
         for (let i = 0; i < initialCoinCount; i++) {
             spawnCoin();
         }
@@ -391,6 +417,7 @@ function restartGame() {
         updateCoinSpeed();
         updateGameAreaRect();
         startScreen.style.display = 'none';
+        characterSelection.style.display = 'none';
         gameArea.style.display = 'block';
         controls.style.display = 'flex';
         restartContainer.style.display = 'flex';
@@ -534,13 +561,12 @@ function collectCoin(coin) {
             gameArea.appendChild(explosion);
         }
 
-        // Disable glow animation on mobile for performance
         if (!isMobile) {
             character.classList.add('glow');
             setTimeout(() => {
                 if (explosion && explosion.parentNode) explosion.remove();
                 character.classList.remove('glow');
-            }, 500); // Reduced duration to match simplified explode animation
+            }, 500);
         } else {
             setTimeout(() => {
                 if (explosion && explosion.parentNode) explosion.remove();
@@ -641,7 +667,6 @@ function gameLoop(timestamp) {
             const duration = performance.now() - start;
             if (duration > 16) {
                 console.warn(`Slow frame: ${duration.toFixed(2)}ms, coins: ${coinCount}, level: ${level}, collision: ${timestamp - lastCollisionCheck}ms, spawn: ${timestamp - lastSpawnTime}ms`);
-                // Pause coin spawning on slow frames
                 if (duration > 50) {
                     console.warn('Pausing coin spawn due to slow frame');
                     lastSpawnTime += 500;
@@ -716,6 +741,7 @@ document.addEventListener('DOMContentLoaded', () => {
             addressContainer.style.display = 'none';
         }
         startScreen.style.display = 'block';
+        characterSelection.style.display = 'none';
         console.log('Initial game state set');
     } catch (error) {
         console.error('Failed to initialize game state:', error, error.stack);
