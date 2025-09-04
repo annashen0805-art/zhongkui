@@ -30,7 +30,7 @@
             padding: 20px;
             border-radius: 10px;
             z-index: 10;
-			animation: glow 1s ease-in-out infinite alternate;
+            animation: glow 1s ease-in-out infinite alternate;
         }
         #start-button {
             padding: 15px 30px;
@@ -40,7 +40,7 @@
             cursor: pointer;
             margin-top: 20px;
             background-color: #fff;
-			animation: glow 1s ease-in-out infinite alternate;
+            animation: glow 1s ease-in-out infinite alternate;
         }
         #start-button:hover {
             background-color: #ddd;
@@ -219,7 +219,7 @@
             cursor: pointer;
             touch-action: manipulation;
             background-color: rgba(255, 255, 255, 0.9);
-			animation: glow 1s ease-in-out infinite alternate;
+            animation: glow 1s ease-in-out infinite alternate;
         }
         #left-button:hover, #jump-button:hover, #right-button:hover, #restart-button:hover {
             background-color: #ddd;
@@ -237,24 +237,31 @@
             font-size: 18px;
             color: #ffd700;
             background-color: rgba(0, 0, 0, 0.7);
-            padding: 10px 15px;
+            padding: 8px 12px;
             border-radius: 5px;
             z-index: 8;
             text-shadow: 0 0 5px #ff4500;
             animation: glow 1s ease-in-out infinite alternate;
+            max-width: 90%;
+            flex-wrap: nowrap;
         }
         #address-text {
             font-weight: bold;
             letter-spacing: 1px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
         }
         #copy-button {
-            padding: 8px 15px;
+            padding: 8px 12px;
             font-size: 16px;
             border: 1px solid #ffd700;
             border-radius: 5px;
             cursor: pointer;
             background-color: rgba(255, 215, 0, 0.9);
             color: #333;
+            flex-shrink: 0;
         }
         #copy-button:hover {
             background-color: rgba(255, 215, 0, 0.7);
@@ -298,6 +305,19 @@
                 font-size: 14px;
                 padding: 6px 12px;
             }
+            #address-container {
+                font-size: 14px;
+                padding: 6px 10px;
+                max-width: 85%;
+                gap: 8px;
+            }
+            #address-text {
+                max-width: 120px;
+            }
+            #copy-button {
+                padding: 6px 10px;
+                font-size: 14px;
+            }
         }
     </style>
 </head>
@@ -331,7 +351,7 @@
         <button id="restart-button" aria-label="重新开始游戏">重新开始</button>
     </div>
     <div id="address-container">
-        <span id="address-text">0xead5dcadb47aacc9e051a8c1462d6175be72df69</span>
+        <span id="address-text" data-full-address="0xead5dcadb47aacc9e051a8c1462d6175be72df69">0xead5dcadb47aacc9e051a8c1462d6175be72df69</span>
         <button id="copy-button" aria-label="复制地址">复制</button>
     </div>
     <div id="copy-toast" class="copy-toast">地址已复制！</div>
