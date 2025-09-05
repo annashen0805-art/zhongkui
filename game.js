@@ -2,6 +2,14 @@ console.log('game.js loaded');
 
 const startScreen = document.getElementById('start-screen');
 const startButton = document.getElementById('start-button');
+const resumeButton = document.getElementById('resume-button');
+const leaderboardButton = document.getElementById('leaderboard-button');
+const gameLeaderboardButton = document.getElementById('game-leaderboard-button');
+const nameInputScreen = document.getElementById('name-input-screen');
+const nameInput = document.getElementById('name-input');
+const nameSubmitButton = document.getElementById('name-submit-button');
+const leaderboardScreen = document.getElementById('leaderboard-screen');
+const leaderboardBackButton = document.getElementById('leaderboard-back-button');
 const characterSelection = document.getElementById('character-selection');
 const gameArea = document.getElementById('game-area');
 const controls = document.getElementById('controls');
@@ -13,7 +21,6 @@ const levelDisplay = document.getElementById('level');
 const gameOverDisplay = document.getElementById('game-over');
 const gameOverOverlay = document.getElementById('game-over-overlay');
 const leftButton = document.getElementById('left-button');
-const jumpButton = document.getElementById('jump-button');
 const rightButton = document.getElementById('right-button');
 const restartButton = document.getElementById('restart-button');
 const bgMusic = document.getElementById('bg-music');
@@ -25,6 +32,14 @@ const copyButton = document.getElementById('copy-button');
 const missingElements = [];
 if (!startScreen) missingElements.push('start-screen');
 if (!startButton) missingElements.push('start-button');
+if (!resumeButton) missingElements.push('resume-button');
+if (!leaderboardButton) missingElements.push('leaderboard-button');
+if (!gameLeaderboardButton) missingElements.push('game-leaderboard-button');
+if (!nameInputScreen) missingElements.push('name-input-screen');
+if (!nameInput) missingElements.push('name-input');
+if (!nameSubmitButton) missingElements.push('name-submit-button');
+if (!leaderboardScreen) missingElements.push('leaderboard-screen');
+if (!leaderboardBackButton) missingElements.push('leaderboard-back-button');
 if (!characterSelection) missingElements.push('character-selection');
 if (!gameArea) missingElements.push('game-area');
 if (!character) missingElements.push('character');
@@ -80,7 +95,6 @@ const gameConfig = {
         spawnIntervalDecrease: 25,
         minSpawnInterval: 500,
         moveSpeed: 5,
-        jumpHeight: '-150px',
         initialFallDuration: 6,
         fallDurationDecrease: 0.3,
         minFallDuration: 2,
@@ -93,7 +107,6 @@ let score = 0;
 let highScore = localStorage.getItem('highScore') || 0;
 let life = currentConfig.maxLife;
 let level = 1;
-let isJumping = false;
 let coinCount = 0;
 let spawnInterval = currentConfig.initialSpawnInterval;
 let isGameOver = false;
@@ -103,14 +116,18 @@ let isFacingRight = true;
 let moveDirection = 0;
 let lastCollisionCheck = 0;
 let lastFrameTime = 0;
+let lastSessionSave = 0;
+let playerNameOrAddress = '';
+let playerFullAddress = null;
 const collisionCheckInterval = 250;
+const sessionSaveInterval = 1000;
 const coins = [];
 const explosionPool = [];
 const maxExplosionPoolSize = 10;
 let gameAreaRect = null;
 let cachedCharacterRect = null;
 let lastBackgroundUpdateLife = life;
-let selectedCharacterImage = 'https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/characters.png'; // Default character
+let selectedCharacterImage = 'https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/characters.png';
 
 // Fallback base64 images
 const fallbackCharacterImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGURgAAAABJRU5ErkJggg==';
@@ -148,6 +165,54 @@ bgMusic.onerror = () => {
     console.error('Failed to load audio: https://zhongkui-okayplay.com/zhongkui.mp3');
 };
 
+// Leaderboard functions
+function truncateAddress(address) {
+    if (!address || !address.startsWith('0x')) return address;
+    return `${address.slice(0, 4)}...${address.slice(-4)}`;
+}
+
+function saveHighScore(score, nameOrAddress, fullAddress) {
+    try {
+        const highScores = getHighScores();
+        highScores.push({ nameOrAddress: truncateAddress(nameOrAddress), fullAddress, score });
+        highScores.sort((a, b) => b.score - a.score);
+        highScores.splice(10);
+        localStorage.setItem('highScores', JSON.stringify(highScores));
+        console.log('High score saved:', { nameOrAddress, fullAddress, score });
+    } catch (error) {
+        console.error('Failed to save high score:', error, error.stack);
+    }
+}
+
+function getHighScores() {
+    try {
+        const highScores = localStorage.getItem('highScores');
+        return highScores ? JSON.parse(highScores) : [];
+    } catch (error) {
+        console.error('Failed to get high scores:', error, error.stack);
+        return [];
+    }
+}
+
+function updateLeaderboardDisplay() {
+    try {
+        const highScores = getHighScores();
+        const leaderboardBody = document.getElementById('leaderboard-body');
+        leaderboardBody.innerHTML = '';
+        highScores.forEach((entry, index) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${index + 1}</td>
+                <td>${entry.nameOrAddress}</td>
+                <td>${entry.score}</td>
+            `;
+            leaderboardBody.appendChild(row);
+        });
+    } catch (error) {
+        console.error('Failed to update leaderboard display:', error, error.stack);
+    }
+}
+
 function updateGameAreaRect() {
     try {
         gameAreaRect = gameArea.getBoundingClientRect();
@@ -163,9 +228,165 @@ window.addEventListener('resize', () => {
 });
 updateGameAreaRect();
 
+// Session management functions
+function saveSession() {
+    try {
+        const session = {
+            score,
+            highScore,
+            life,
+            level,
+            characterX,
+            isFacingRight,
+            spawnInterval,
+            selectedCharacterImage,
+            playerNameOrAddress,
+            playerFullAddress,
+            coins: coins.map(coin => ({
+                left: parseFloat(coin.style.left) || 0,
+                top: parseFloat(coin.style.top) || -70,
+                fallDuration: parseFloat(coin.style.getPropertyValue('--fall-duration')) || currentConfig.initialFallDuration,
+            })),
+            timestamp: Date.now(),
+        };
+        localStorage.setItem('gameSession', JSON.stringify(session));
+        console.log('Session saved:', session);
+    } catch (error) {
+        console.error('Failed to save session:', error, error.stack);
+    }
+}
+
+function loadSession() {
+    try {
+        const sessionData = localStorage.getItem('gameSession');
+        if (!sessionData) return false;
+        const session = JSON.parse(sessionData);
+        if (
+            !session ||
+            typeof session.score !== 'number' ||
+            typeof session.highScore !== 'number' ||
+            typeof session.life !== 'number' || session.life < 0 || session.life > currentConfig.maxLife ||
+            typeof session.level !== 'number' || session.level < 1 ||
+            typeof session.characterX !== 'number' || session.characterX < 9 || session.characterX > 91 ||
+            typeof session.isFacingRight !== 'boolean' ||
+            typeof session.spawnInterval !== 'number' || session.spawnInterval < currentConfig.minSpawnInterval ||
+            typeof session.selectedCharacterImage !== 'string' ||
+            typeof session.playerNameOrAddress !== 'string' ||
+            !Array.isArray(session.coins) ||
+            !session.timestamp || (Date.now() - session.timestamp > 3600000)
+        ) {
+            console.warn('Invalid or expired session data, clearing session');
+            localStorage.removeItem('gameSession');
+            return false;
+        }
+
+        coins.forEach(coin => {
+            if (coin.parentNode) {
+                coin.cleanup();
+                coin.remove();
+            }
+        });
+        coins.length = 0;
+        coinCount = 0;
+
+        score = session.score;
+        highScore = session.highScore;
+        localStorage.setItem('highScore', highScore);
+        life = session.life;
+        level = session.level;
+        characterX = session.characterX;
+        isFacingRight = session.isFacingRight;
+        spawnInterval = session.spawnInterval;
+        selectedCharacterImage = session.selectedCharacterImage;
+        playerNameOrAddress = session.playerNameOrAddress;
+        playerFullAddress = session.playerFullAddress;
+        character.style.backgroundImage = `url("${selectedCharacterImage}")`;
+        character.style.left = `${characterX}%`;
+        character.style.transform = `translateX(-50%) scaleX(${isFacingRight ? 1 : -1}) translateZ(0)`;
+        if (scoreDisplay) scoreDisplay.textContent = `得分: ${score} | 最高分: ${highScore}`;
+        if (lifeDisplay) lifeDisplay.textContent = `生命: ${life}`;
+        if (levelDisplay) levelDisplay.textContent = `等级: ${level}`;
+
+        session.coins.forEach(coinData => {
+            const coin = document.createElement('div');
+            coin.classList.add('coin');
+            coin.style.left = `${coinData.left}px`;
+            coin.style.top = `${coinData.top}px`;
+            coin.style.setProperty('--fall-duration', `${coinData.fallDuration}s`);
+            gameArea.appendChild(coin);
+            coins.push(coin);
+            coinCount++;
+
+            coin.onerror = () => {
+                coin.style.backgroundImage = `url("${fallbackCoinImage}")`;
+                console.warn('Coin image failed to load, using fallback.');
+            };
+
+            const handleAnimationEnd = (e) => {
+                if (e.animationName === 'fall' && coin.parentNode) {
+                    coin.cleanup();
+                    coin.remove();
+                    coins.splice(coins.indexOf(coin), 1);
+                    coinCount--;
+                    life--;
+                    if (lifeDisplay) lifeDisplay.textContent = `生命: ${life}`;
+                    if (life <= 0) gameOver();
+                }
+            };
+
+            const handleClick = (e) => {
+                e.stopPropagation();
+                if (!isGameOver) collectCoin(coin);
+            };
+
+            coin.addEventListener('animationend', handleAnimationEnd);
+            coin.addEventListener('click', handleClick);
+            coin.cleanup = () => {
+                try {
+                    coin.removeEventListener('animationend', handleAnimationEnd);
+                    coin.removeEventListener('click', handleClick);
+                    coin.onerror = null;
+                    coin.style.animation = 'none';
+                } catch (error) {
+                    console.error('Failed to clean up coin:', error, error.stack);
+                }
+            };
+        });
+
+        console.log('Session loaded:', session);
+        return true;
+    } catch (error) {
+        console.error('Failed to load session:', error, error.stack);
+        localStorage.removeItem('gameSession');
+        return false;
+    }
+}
+
+function clearSession() {
+    try {
+        localStorage.removeItem('gameSession');
+        console.log('Session cleared');
+    } catch (error) {
+        console.error('Failed to clear session:', error, error.stack);
+    }
+}
+
+function showNameInputScreen() {
+    try {
+        startScreen.classList.remove('show');
+        nameInputScreen.classList.add('show');
+        nameInput.value = '';
+        nameInput.focus();
+        console.log('Showing name input screen');
+    } catch (error) {
+        console.error('Failed to show name input screen:', error, error.stack);
+        showError('无法显示名称输入界面，请刷新页面重试。');
+    }
+}
+
 function showCharacterSelection() {
     try {
-        startScreen.style.display = 'none';
+        nameInputScreen.classList.remove('show');
         characterSelection.style.display = 'block';
         console.log('Showing character selection screen');
     } catch (error) {
@@ -174,19 +395,139 @@ function showCharacterSelection() {
     }
 }
 
+function showLeaderboardScreen(fromGame = false) {
+    try {
+        if (fromGame) {
+            gameArea.style.display = 'none';
+            controls.style.display = 'none';
+            restartContainer.style.display = 'none';
+            addressContainer.style.display = 'none';
+            isGameOver = true;
+            saveSession();
+            bgMusic.pause();
+        } else {
+            startScreen.classList.remove('show');
+        }
+        leaderboardScreen.classList.add('show');
+        updateLeaderboardDisplay();
+        console.log('Showing leaderboard screen');
+    } catch (error) {
+        console.error('Failed to show leaderboard screen:', error, error.stack);
+        showError('无法显示排行榜，请刷新页面重试。');
+    }
+}
+
+function hideLeaderboardScreen() {
+    try {
+        leaderboardScreen.classList.remove('show');
+        if (gameArea.style.display === 'none' && !gameOverDisplay.style.display) {
+            gameArea.style.display = 'block';
+            controls.style.display = 'flex';
+            restartContainer.style.display = 'flex';
+            addressContainer.style.display = 'flex';
+            isGameOver = false;
+            lastSpawnTime = performance.now();
+            lastCollisionCheck = performance.now();
+            lastFrameTime = performance.now();
+            lastSessionSave = performance.now();
+            cachedCharacterRect = null;
+            updateGameAreaRect();
+            updateCoinSpeed();
+            requestAnimationFrame(gameLoop);
+            bgMusic.play().catch(error => {
+                console.error('Background music failed to play:', error, error.stack);
+            });
+        } else {
+            startScreen.classList.add('show');
+        }
+        console.log('Hiding leaderboard screen');
+    } catch (error) {
+        console.error('Failed to hide leaderboard screen:', error, error.stack);
+        showError('无法隐藏排行榜，请刷新页面重试。');
+    }
+}
+
 function startGame() {
     try {
-        console.log('Starting game, showing character selection...');
-        showCharacterSelection();
+        clearSession();
+        console.log('Starting game, showing name input screen...');
+        showNameInputScreen();
     } catch (error) {
         console.error('Failed to start game:', error, error.stack);
         showError('无法启动游戏，请刷新页面重试。');
     }
 }
 
-startButton.addEventListener('click', startGame);
+function resumeGame() {
+    try {
+        if (loadSession()) {
+            startScreen.classList.remove('show');
+            isGameOver = false;
+            characterSelection.style.display = 'none';
+            nameInputScreen.classList.remove('show');
+            gameArea.style.display = 'block';
+            controls.style.display = 'flex';
+            restartContainer.style.display = 'flex';
+            addressContainer.style.display = 'flex';
+            lastSpawnTime = performance.now();
+            lastCollisionCheck = performance.now();
+            lastFrameTime = performance.now();
+            lastSessionSave = performance.now();
+            cachedCharacterRect = null;
+            updateGameAreaRect();
+            updateCoinSpeed();
+            requestAnimationFrame(gameLoop);
+            bgMusic.play().catch(error => {
+                console.error('背景音乐播放失败:', error, error.stack);
+            });
+            console.log('Game resumed');
+        } else {
+            console.log('No valid session to resume, starting new game');
+            showNameInputScreen();
+        }
+    } catch (error) {
+        console.error('Failed to resume game:', error, error.stack);
+        showError('无法恢复游戏，请刷新页面重试。');
+    }
+}
 
-// Handle character selection
+startButton.addEventListener('click', startGame);
+if (resumeButton) {
+    resumeButton.addEventListener('click', resumeGame);
+}
+if (leaderboardButton) {
+    leaderboardButton.addEventListener('click', () => showLeaderboardScreen(false));
+}
+if (gameLeaderboardButton) {
+    gameLeaderboardButton.addEventListener('click', () => showLeaderboardScreen(true));
+}
+if (leaderboardBackButton) {
+    leaderboardBackButton.addEventListener('click', hideLeaderboardScreen);
+}
+if (nameSubmitButton) {
+    nameSubmitButton.addEventListener('click', () => {
+        const input = nameInput.value.trim();
+        const ethAddressRegex = /^0x[a-fA-F0-9]{40}$/;
+        if (input === '') {
+            alert('请输入名称或有效的以太坊地址');
+            return;
+        }
+        if (ethAddressRegex.test(input)) {
+            playerNameOrAddress = truncateAddress(input);
+            playerFullAddress = input;
+        } else {
+            playerNameOrAddress = input;
+            playerFullAddress = null;
+        }
+        showCharacterSelection();
+    });
+    nameInput.addEventListener('keydown', (e) => {
+        if (e.code === 'Enter') {
+            nameSubmitButton.click();
+        }
+    });
+}
+
 document.querySelectorAll('.select-character-button').forEach(button => {
     button.addEventListener('click', () => {
         try {
@@ -209,34 +550,19 @@ document.querySelectorAll('.select-character-button').forEach(button => {
     });
 });
 
-function jump() {
-    if (!isJumping && !isGameOver) {
-        isJumping = true;
-        cachedCharacterRect = null;
-        character.style.transform = `translateX(-50%) translateY(${currentConfig.jumpHeight}) scaleX(${isFacingRight ? 1 : -1}) translateZ(0)`;
-        setTimeout(() => {
-            character.style.transform = `translateX(-50%) translateY(0) scaleX(${isFacingRight ? 1 : -1}) translateZ(0)`;
-            isJumping = false;
-            cachedCharacterRect = null;
-        }, 300);
-    }
-}
-
 function updateCharacterPosition() {
     if (!isGameOver && moveDirection !== 0) {
         characterX = Math.max(9, Math.min(91, characterX + moveDirection * currentConfig.moveSpeed));
         character.style.left = `${characterX}%`;
         isFacingRight = moveDirection > 0;
-        character.style.transform = `translateX(-50%) scaleX(${isFacingRight ? 1 : -1})${isJumping ? ` translateY(${currentConfig.jumpHeight})` : ''} translateZ(0)`;
+        character.style.transform = `translateX(-50%) scaleX(${isFacingRight ? 1 : -1}) translateZ(0)`;
         cachedCharacterRect = null;
     }
 }
 
 document.addEventListener('keydown', (e) => {
-    if (e.code === 'Space') {
-        e.preventDefault();
-        jump();
-    } else if (e.code === 'ArrowLeft') {
+    if (isGameOver) return;
+    if (e.code === 'ArrowLeft') {
         e.preventDefault();
         moveDirection = -1;
     } else if (e.code === 'ArrowRight') {
@@ -258,7 +584,7 @@ leftButton.addEventListener('mousedown', (e) => {
     if (!isGameOver) moveDirection = -1;
 });
 leftButton.addEventListener('touchstart', (e) => {
-    if (!isGameOver) e.preventDefault();
+    e.preventDefault();
     if (!isGameOver) moveDirection = -1;
 });
 leftButton.addEventListener('mouseup', () => {
@@ -277,7 +603,7 @@ rightButton.addEventListener('mousedown', (e) => {
     if (!isGameOver) moveDirection = 1;
 });
 rightButton.addEventListener('touchstart', (e) => {
-    if (!isGameOver) e.preventDefault();
+    e.preventDefault();
     if (!isGameOver) moveDirection = 1;
 });
 rightButton.addEventListener('mouseup', () => {
@@ -291,63 +617,23 @@ rightButton.addEventListener('mouseleave', () => {
     moveDirection = 0;
 });
 
-jumpButton.addEventListener('click', (e) => {
-    e.preventDefault();
-    jump();
-});
-
-let touchStartX = 0;
-let lastTouchMove = 0;
-let hasSwiped = false;
-const touchMoveThrottle = 100;
-gameArea.addEventListener('touchstart', (e) => {
-    console.log('Touchstart detected at:', performance.now());
-    if (!isGameOver) e.preventDefault();
-    touchStartX = e.touches[0].clientX;
-    hasSwiped = false;
-}, { passive: false });
-
-gameArea.addEventListener('touchmove', (e) => {
-    if (!isGameOver) e.preventDefault();
-    if (e.touches.length > 1) {
-        console.log('Multi-touch detected, ignoring');
-        return;
-    }
-    if (performance.now() - lastTouchMove < touchMoveThrottle) return;
-    lastTouchMove = performance.now();
-    let touchEndX = e.touches[0].clientX;
-    const swipeThreshold = 50 / window.devicePixelRatio;
-    if (Math.abs(touchEndX - touchStartX) > swipeThreshold) {
-        hasSwiped = true;
-        moveDirection = touchEndX > touchStartX ? 1 : -1;
-    }
-}, { passive: false });
-
-gameArea.addEventListener('touchend', (e) => {
-    if (!isGameOver) e.preventDefault();
-    setTimeout(() => {
-        moveDirection = 0;
-        if (!hasSwiped) jump();
-        hasSwiped = false;
-    }, 50);
-}, { passive: false });
-
-character.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (isMobile) jump();
-});
-
 restartButton.addEventListener('click', () => {
+    clearSession();
+    saveHighScore(score, playerNameOrAddress, playerFullAddress);
     restartGame();
 });
 
 gameOverDisplay.addEventListener('click', (e) => {
     if (e.target.id !== 'game-over-restart') return;
+    clearSession();
+    saveHighScore(score, playerNameOrAddress, playerFullAddress);
     restartGame();
 });
 
 gameOverDisplay.addEventListener('keydown', (e) => {
     if (e.code === 'Enter') {
+        clearSession();
+        saveHighScore(score, playerNameOrAddress, playerFullAddress);
         restartGame();
     }
 });
@@ -363,6 +649,7 @@ function showError(message) {
         gameOverOverlay.style.display = 'block';
         isGameOver = true;
         bgMusic.pause();
+        saveSession();
     } catch (error) {
         console.error('Failed to show error:', error, error.stack);
     }
@@ -380,7 +667,7 @@ function restartGame() {
         moveDirection = 0;
         character.style.left = `${characterX}%`;
         character.style.transform = `translateX(-50%) scaleX(1) translateZ(0)`;
-        character.style.backgroundImage = `url("${selectedCharacterImage}")`; // Preserve selected character
+        character.style.backgroundImage = `url("${selectedCharacterImage}")`;
         if (scoreDisplay) scoreDisplay.textContent = `得分: ${score} | 最高分: ${highScore}`;
         if (lifeDisplay) lifeDisplay.textContent = `生命: ${life}`;
         if (levelDisplay) levelDisplay.textContent = `等级: ${level}`;
@@ -414,9 +701,11 @@ function restartGame() {
         lastSpawnTime = performance.now();
         lastCollisionCheck = performance.now();
         lastFrameTime = performance.now();
+        lastSessionSave = performance.now();
         updateCoinSpeed();
         updateGameAreaRect();
-        startScreen.style.display = 'none';
+        startScreen.classList.remove('show');
+        nameInputScreen.classList.remove('show');
         characterSelection.style.display = 'none';
         gameArea.style.display = 'block';
         controls.style.display = 'flex';
@@ -579,6 +868,7 @@ function collectCoin(coin) {
             coins.splice(coins.indexOf(coin), 1);
             coinCount--;
         }
+        saveSession();
     } catch (error) {
         console.error('Failed to collect coin:', error, error.stack);
     }
@@ -621,6 +911,7 @@ function gameOver() {
     try {
         isGameOver = true;
         console.log('Game over, coins:', coins.length, 'coinCount:', coinCount);
+        saveHighScore(score, playerNameOrAddress, playerFullAddress);
         gameOverDisplay.innerHTML = `
             <div>游戏结束！</div>
             <div id="game-over-level">等级: ${level}</div>
@@ -643,6 +934,7 @@ function gameOver() {
         coinCount = 0;
         console.log('Coins after game over cleanup:', coins.length, 'coinCount:', coinCount);
         bgMusic.pause();
+        saveSession();
     } catch (error) {
         console.error('Failed to end game:', error, error.stack);
         showError('游戏结束失败，请刷新页面重试。');
@@ -662,6 +954,10 @@ function gameLoop(timestamp) {
             if (timestamp - lastSpawnTime >= spawnInterval && coinCount < currentConfig.maxCoins(level)) {
                 spawnCoin();
                 lastSpawnTime = timestamp;
+            }
+            if (timestamp - lastSessionSave >= sessionSaveInterval) {
+                saveSession();
+                lastSessionSave = timestamp;
             }
             lastFrameTime = timestamp;
             const duration = performance.now() - start;
@@ -690,11 +986,13 @@ document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
             isGameOver = true;
             bgMusic.pause();
+            saveSession();
         } else if (!gameOverDisplay.style.display && gameArea.style.display === 'block') {
             isGameOver = false;
             lastSpawnTime = performance.now();
             lastCollisionCheck = performance.now();
             lastFrameTime = performance.now();
+            lastSessionSave = performance.now();
             cachedCharacterRect = null;
             updateGameAreaRect();
             updateCoinSpeed();
@@ -721,6 +1019,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const addressText = document.getElementById('address-text');
         const copyButton = document.getElementById('copy-button');
         const gameOverOverlay = document.getElementById('game-over-overlay');
+        const resumeButton = document.getElementById('resume-button');
         const missingElements = [];
         if (!scoreDisplay) missingElements.push('score');
         if (!lifeDisplay) missingElements.push('life');
@@ -729,6 +1028,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!addressText) missingElements.push('address-text');
         if (!copyButton) missingElements.push('copy-button');
         if (!gameOverOverlay) missingElements.push('game-over-overlay');
+        if (!resumeButton) missingElements.push('resume-button');
         if (missingElements.length > 0) {
             console.error(`Missing DOM elements during initialization: ${missingElements.join(', ')}`);
             document.body.innerHTML += `<div style="color: red; text-align: center; padding: 10px;">
@@ -739,9 +1039,16 @@ document.addEventListener('DOMContentLoaded', () => {
             lifeDisplay.textContent = `生命: ${life}`;
             levelDisplay.textContent = `等级: ${level}`;
             addressContainer.style.display = 'none';
+            if (localStorage.getItem('gameSession')) {
+                resumeButton.style.display = 'inline-block';
+            } else {
+                resumeButton.style.display = 'none';
+            }
         }
-        startScreen.style.display = 'block';
+        startScreen.classList.add('show');
+        nameInputScreen.classList.remove('show');
         characterSelection.style.display = 'none';
+        leaderboardScreen.classList.remove('show');
         console.log('Initial game state set');
     } catch (error) {
         console.error('Failed to initialize game state:', error, error.stack);
