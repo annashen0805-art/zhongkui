@@ -17,7 +17,7 @@
             overflow: hidden;
             z-index: 0;
         }
-        #start-screen {
+        #start-screen, #name-input-screen, #leaderboard-screen {
             position: absolute;
             top: 50%;
             left: 50%;
@@ -31,8 +31,18 @@
             border-radius: 10px;
             z-index: 10;
             animation: glow 1s ease-in-out infinite alternate;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+            opacity: 0;
+            visibility: hidden;
         }
-        #start-button {
+        #start-screen.show, #name-input-screen.show, #leaderboard-screen.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        #name-input-screen, #leaderboard-screen {
+            display: block;
+        }
+        #start-button, #resume-button, #leaderboard-button, #name-submit-button, #leaderboard-back-button {
             padding: 15px 30px;
             font-size: 24px;
             border: 1px solid #333;
@@ -41,12 +51,43 @@
             margin-top: 20px;
             background-color: #fff;
             animation: glow 1s ease-in-out infinite alternate;
+            display: inline-block;
+            margin-left: 10px;
+            margin-right: 10px;
         }
-        #start-button:hover {
+        #start-button:hover, #resume-button:hover, #leaderboard-button:hover, #name-submit-button:hover, #leaderboard-back-button:hover {
             background-color: #ddd;
         }
-        #start-button:active {
+        #start-button:active, #resume-button:active, #leaderboard-button:active, #name-submit-button:active, #leaderboard-back-button:active {
             background-color: #bbb;
+        }
+        #name-input {
+            padding: 10px;
+            font-size: 18px;
+            border: 1px solid #333;
+            border-radius: 5px;
+            margin-top: 20px;
+            width: 250px;
+            max-width: 90%;
+        }
+        #leaderboard-table {
+            width: 100%;
+            max-width: 400px;
+            margin: 20px auto;
+            border-collapse: collapse;
+            font-size: 18px;
+            color: #333;
+        }
+        #leaderboard-table th, #leaderboard-table td {
+            padding: 10px;
+            border: 1px solid #333;
+            text-align: center;
+        }
+        #leaderboard-table th {
+            background-color: rgba(255, 215, 0, 0.9);
+        }
+        #leaderboard-table td {
+            background-color: rgba(255, 255, 255, 0.9);
         }
         #character-selection {
             position: absolute;
@@ -121,7 +162,7 @@
             background-size: contain;
             background-repeat: no-repeat;
             background-color: transparent;
-            transition: transform 0.3s ease, left 0.2s ease;
+            transition: left 0.2s ease;
             z-index: 6;
             will-change: transform, left;
         }
@@ -251,9 +292,9 @@
             display: none;
             z-index: 8;
         }
-        #left-button, #jump-button, #right-button, #restart-button {
-            padding: 15px 30px;
-            font-size: 18px;
+        #left-button, #right-button, #restart-button, #game-leaderboard-button {
+            padding: 20px 40px;
+            font-size: 20px;
             border: 1px solid #333;
             border-radius: 5px;
             cursor: pointer;
@@ -261,10 +302,10 @@
             background-color: rgba(255, 255, 255, 0.9);
             animation: glow 1s ease-in-out infinite alternate;
         }
-        #left-button:hover, #jump-button:hover, #right-button:hover, #restart-button:hover {
+        #left-button:hover, #right-button:hover, #restart-button:hover, #game-leaderboard-button:hover {
             background-color: #ddd;
         }
-        #left-button:active, #jump-button:active, #right-button:active, #restart-button:active {
+        #left-button:active, #right-button:active, #restart-button:active, #game-leaderboard-button:active {
             background-color: #bbb;
         }
         #address-container {
@@ -370,6 +411,28 @@
                 font-size: 16px;
                 padding: 8px 16px;
             }
+            #start-button, #resume-button, #leaderboard-button, #name-submit-button, #leaderboard-back-button, #game-leaderboard-button {
+                padding: 12px 24px;
+                font-size: 20px;
+                margin-left: 5px;
+                margin-right: 5px;
+            }
+            #left-button, #right-button, #restart-button, #game-leaderboard-button {
+                padding: 15px 30px;
+                font-size: 16px;
+            }
+            #name-input {
+                font-size: 16px;
+                padding: 8px;
+                width: 200px;
+            }
+            #leaderboard-table {
+                font-size: 16px;
+                max-width: 300px;
+            }
+            #leaderboard-table th, #leaderboard-table td {
+                padding: 8px;
+            }
             @keyframes glow {
                 0% { box-shadow: 0 0 5px yellow; }
                 100% { box-shadow: 0 0 0 transparent; }
@@ -381,6 +444,27 @@
     <div id="start-screen">
         <div>欢迎体验钟馗游戏！</div>
         <button id="start-button" aria-label="开始游戏">开始游戏</button>
+        <button id="resume-button" aria-label="继续游戏" style="display: none;">继续游戏</button>
+        <button id="leaderboard-button" aria-label="查看排行榜">排行榜</button>
+    </div>
+    <div id="name-input-screen">
+        <div>请输入您的名称或以太坊地址</div>
+        <input id="name-input" type="text" placeholder="名称或0x地址" aria-label="输入名称或以太坊地址">
+        <button id="name-submit-button" aria-label="提交名称或地址">提交</button>
+    </div>
+    <div id="leaderboard-screen">
+        <div>排行榜</div>
+        <table id="leaderboard-table">
+            <thead>
+                <tr>
+                    <th>排名</th>
+                    <th>名称/地址</th>
+                    <th>得分</th>
+                </tr>
+            </thead>
+            <tbody id="leaderboard-body"></tbody>
+        </table>
+        <button id="leaderboard-back-button" aria-label="返回主菜单">返回</button>
     </div>
     <div id="character-selection">
         <div>
@@ -410,16 +494,16 @@
             <div id="game-over-high-score">最高分: 0</div>
             <div id="game-over-life">生命: 5</div>
             <div>再试一次，挑战更高分数！</div>
-            <button id="game-over-restart" ariaa-label="重新开始游戏">重新开始</button>
+            <button id="game-over-restart" aria-label="重新开始游戏">重新开始</button>
         </div>
     </div>
     <div id="controls">
         <button id="left-button" aria-label="向左移动角色">左</button>
-        <button id="jump-button" aria-label="使角色跳跃">跳跃</button>
         <button id="right-button" aria-label="向右移动角色">右</button>
     </div>
     <div id="restart-container">
         <button id="restart-button" aria-label="重新开始游戏">重新开始</button>
+        <button id="game-leaderboard-button" aria-label="查看排行榜">排行榜</button>
     </div>
     <div id="address-container">
         <span id="address-text" data-full-address="0xead5dcadb47aacc9e051a8c1462d6175be72df69">0xead5dcadb47aacc9e051a8c1462d6175be72df69</span>
