@@ -1,5 +1,29 @@
 console.log('game.js loaded');
 
+// Firebase Initialization
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+import { getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+import { getAnalytics, logEvent, setUserProperties } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-analytics.js";
+
+// Firebase Configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyCB2K1A1RnyW-CgdpqxqMQpNCa8q4QGbb0",
+  authDomain: "zhongkuigame.firebaseapp.com",
+  projectId: "zhongkuigame",
+  storageBucket: "zhongkuigame.firebasestorage.app",
+  messagingSenderId: "1033593706121",
+  appId: "1:1033593706121:web:d08d00fa21aaca9e6fd858",
+  measurementId: "G-D8MV3EJCHL"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+const analytics = getAnalytics(app);
+
+// DOM element references
 const startScreen = document.getElementById('start-screen');
 const startButton = document.getElementById('start-button');
 const resumeButton = document.getElementById('resume-button');
@@ -27,6 +51,7 @@ const bgMusic = document.getElementById('bg-music');
 const addressContainer = document.getElementById('address-container');
 const addressText = document.getElementById('address-text');
 const copyButton = document.getElementById('copy-button');
+const copyToast = document.getElementById('copy-toast');
 
 // Validate critical DOM elements
 const missingElements = [];
@@ -59,19 +84,39 @@ if (missingElements.length > 0) {
     throw new Error(`Missing DOM elements: ${missingElements.join(', ')}`);
 }
 
-// Add copy button functionality
+// Anonymous Authentication
+let currentUser = null;
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        currentUser = user;
+        console.log('User signed in anonymously:', user.uid);
+        try {
+            logEvent(analytics, 'login', { method: 'anonymous' });
+        } catch (error) {
+            console.error('Analytics login event failed:', error);
+        }
+        if (localStorage.getItem('gameSession')) {
+            resumeButton.style.display = 'inline-block';
+        }
+    } else {
+        console.log('No user signed in, attempting anonymous login');
+        signInAnonymously(auth).catch(error => {
+            console.error('Anonymous authentication failed:', error, error.stack);
+            showError('无法登录游戏，请检查网络连接并刷新页面。');
+        });
+    }
+});
+
+// Copy button functionality
 copyButton.addEventListener('click', () => {
     try {
         const fullAddress = addressText.dataset.fullAddress || addressText.textContent;
         navigator.clipboard.writeText(fullAddress).then(() => {
             copyButton.textContent = '已复制!';
             copyButton.style.backgroundColor = 'rgba(50, 205, 50, 0.9)';
-            const toast = document.getElementById('copy-toast');
-            if (toast) {
-                toast.classList.add('show');
-                setTimeout(() => {
-                    toast.classList.remove('show');
-                }, 2000);
+            if (copyToast) {
+                copyToast.classList.add('show');
+                setTimeout(() => copyToast.classList.remove('show'), 2000);
             }
             setTimeout(() => {
                 copyButton.textContent = '复制';
@@ -87,6 +132,7 @@ copyButton.addEventListener('click', () => {
     }
 });
 
+// Game configuration
 const isMobile = /Mobi|Android/i.test(navigator.userAgent);
 const gameConfig = {
     medium: {
@@ -104,7 +150,6 @@ const gameConfig = {
 
 let currentConfig = gameConfig.medium;
 let score = 0;
-let highScore = localStorage.getItem('highScore') || 0;
 let life = currentConfig.maxLife;
 let level = 1;
 let coinCount = 0;
@@ -128,8 +173,9 @@ let gameAreaRect = null;
 let cachedCharacterRect = null;
 let lastBackgroundUpdateLife = life;
 let selectedCharacterImage = 'https://raw.githubusercontent.com/annashen0805-art/zhongkui/main/characters.png';
+let leaderboardListener = null;
 
-// Fallback base64 images
+// Fallback images
 const fallbackCharacterImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGURgAAAABJRU5ErkJggg==';
 const fallbackCoinImage = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHogJ/PdX9BAAAAABJRU5ErkJggg==';
 
@@ -171,32 +217,28 @@ function truncateAddress(address) {
     return `${address.slice(0, 4)}...${address.slice(-4)}`;
 }
 
-function saveHighScore(score, nameOrAddress, fullAddress) {
+async function saveHighScore(score, nameOrAddress, fullAddress) {
     try {
-        const highScores = getHighScores();
-        highScores.push({ nameOrAddress: truncateAddress(nameOrAddress), fullAddress, score });
-        highScores.sort((a, b) => b.score - a.score);
-        highScores.splice(10);
-        localStorage.setItem('highScores', JSON.stringify(highScores));
-        console.log('High score saved:', { nameOrAddress, fullAddress, score });
+        if (!currentUser) {
+            throw new Error('User not authenticated');
+        }
+        const highScoresRef = collection(db, 'highScores');
+        await addDoc(highScoresRef, {
+            nameOrAddress: truncateAddress(nameOrAddress),
+            fullAddress,
+            score,
+            timestamp: new Date().toISOString(),
+            userId: currentUser.uid
+        });
+        console.log('High score saved:', { nameOrAddress, fullAddress, score, userId: currentUser.uid });
     } catch (error) {
         console.error('Failed to save high score:', error, error.stack);
+        showError('无法保存高分，请检查网络连接并重试。');
     }
 }
 
-function getHighScores() {
+function updateLeaderboardDisplay(highScores) {
     try {
-        const highScores = localStorage.getItem('highScores');
-        return highScores ? JSON.parse(highScores) : [];
-    } catch (error) {
-        console.error('Failed to get high scores:', error, error.stack);
-        return [];
-    }
-}
-
-function updateLeaderboardDisplay() {
-    try {
-        const highScores = getHighScores();
         const leaderboardBody = document.getElementById('leaderboard-body');
         leaderboardBody.innerHTML = '';
         highScores.forEach((entry, index) => {
@@ -210,30 +252,34 @@ function updateLeaderboardDisplay() {
         });
     } catch (error) {
         console.error('Failed to update leaderboard display:', error, error.stack);
+        showError('无法更新排行榜，请检查网络连接并重试。');
     }
 }
 
-function updateGameAreaRect() {
+function setupLeaderboardListener() {
     try {
-        gameAreaRect = gameArea.getBoundingClientRect();
+        const highScoresRef = collection(db, 'highScores');
+        const q = query(highScoresRef, orderBy('score', 'desc'), limit(10));
+        leaderboardListener = onSnapshot(q, (snapshot) => {
+            const highScores = [];
+            snapshot.forEach(doc => highScores.push(doc.data()));
+            if (leaderboardScreen.classList.contains('show')) {
+                updateLeaderboardDisplay(highScores);
+            }
+        }, (error) => {
+            console.error('Leaderboard listener error:', error, error.stack);
+            showError('无法实时更新排行榜，请检查网络连接。');
+        });
     } catch (error) {
-        console.error('Failed to update game area rect:', error, error.stack);
+        console.error('Failed to setup leaderboard listener:', error, error.stack);
     }
 }
-
-let resizeTimeout;
-window.addEventListener('resize', () => {
-    clearTimeout(resizeTimeout);
-    resizeTimeout = setTimeout(updateGameAreaRect, 100);
-});
-updateGameAreaRect();
 
 // Session management functions
 function saveSession() {
     try {
         const session = {
             score,
-            highScore,
             life,
             level,
             characterX,
@@ -264,7 +310,6 @@ function loadSession() {
         if (
             !session ||
             typeof session.score !== 'number' ||
-            typeof session.highScore !== 'number' ||
             typeof session.life !== 'number' || session.life < 0 || session.life > currentConfig.maxLife ||
             typeof session.level !== 'number' || session.level < 1 ||
             typeof session.characterX !== 'number' || session.characterX < 9 || session.characterX > 91 ||
@@ -290,8 +335,6 @@ function loadSession() {
         coinCount = 0;
 
         score = session.score;
-        highScore = session.highScore;
-        localStorage.setItem('highScore', highScore);
         life = session.life;
         level = session.level;
         characterX = session.characterX;
@@ -303,7 +346,7 @@ function loadSession() {
         character.style.backgroundImage = `url("${selectedCharacterImage}")`;
         character.style.left = `${characterX}%`;
         character.style.transform = `translateX(-50%) scaleX(${isFacingRight ? 1 : -1}) translateZ(0)`;
-        if (scoreDisplay) scoreDisplay.textContent = `得分: ${score} | 最高分: ${highScore}`;
+        if (scoreDisplay) scoreDisplay.textContent = `得分: ${score} | 最高分: -`;
         if (lifeDisplay) lifeDisplay.textContent = `生命: ${life}`;
         if (levelDisplay) levelDisplay.textContent = `等级: ${level}`;
 
@@ -405,21 +448,35 @@ function showLeaderboardScreen(fromGame = false) {
             isGameOver = true;
             saveSession();
             bgMusic.pause();
+            try {
+                logEvent(analytics, 'view_leaderboard', { context: 'in_game' });
+            } catch (error) {
+                console.error('Analytics view_leaderboard event failed:', error);
+            }
         } else {
             startScreen.classList.remove('show');
+            try {
+                logEvent(analytics, 'view_leaderboard', { context: 'start_screen' });
+            } catch (error) {
+                console.error('Analytics view_leaderboard event failed:', error);
+            }
         }
         leaderboardScreen.classList.add('show');
-        updateLeaderboardDisplay();
+        setupLeaderboardListener();
         console.log('Showing leaderboard screen');
     } catch (error) {
         console.error('Failed to show leaderboard screen:', error, error.stack);
-        showError('无法显示排行榜，请刷新页面重试。');
+        showError('无法显示排行榜，请检查网络连接并重试。');
     }
 }
 
 function hideLeaderboardScreen() {
     try {
         leaderboardScreen.classList.remove('show');
+        if (leaderboardListener) {
+            leaderboardListener();
+            leaderboardListener = null;
+        }
         if (gameArea.style.display === 'none' && !gameOverDisplay.style.display) {
             gameArea.style.display = 'block';
             controls.style.display = 'flex';
@@ -452,6 +509,11 @@ function startGame() {
         clearSession();
         console.log('Starting game, showing name input screen...');
         showNameInputScreen();
+        try {
+            logEvent(analytics, 'game_start', { mode: 'new' });
+        } catch (error) {
+            console.error('Analytics game_start event failed:', error);
+        }
     } catch (error) {
         console.error('Failed to start game:', error, error.stack);
         showError('无法启动游戏，请刷新页面重试。');
@@ -481,6 +543,11 @@ function resumeGame() {
                 console.error('背景音乐播放失败:', error, error.stack);
             });
             console.log('Game resumed');
+            try {
+                logEvent(analytics, 'game_start', { mode: 'resume' });
+            } catch (error) {
+                console.error('Analytics game_start event failed:', error);
+            }
         } else {
             console.log('No valid session to resume, starting new game');
             showNameInputScreen();
@@ -519,6 +586,14 @@ if (nameSubmitButton) {
             playerNameOrAddress = input;
             playerFullAddress = null;
         }
+        try {
+            setUserProperties(analytics, {
+                player_name: playerNameOrAddress.substring(0, 20),
+                is_eth_address: !!playerFullAddress
+            });
+        } catch (error) {
+            console.error('Analytics setUserProperties failed:', error);
+        }
         showCharacterSelection();
     });
     nameInput.addEventListener('keydown', (e) => {
@@ -543,6 +618,13 @@ document.querySelectorAll('.select-character-button').forEach(button => {
             });
             restartGame();
             console.log('Character selected, game started');
+            try {
+                logEvent(analytics, 'select_character', {
+                    character: selectedCharacterImage.split('/').pop()
+                });
+            } catch (error) {
+                console.error('Analytics select_character event failed:', error);
+            }
         } catch (error) {
             console.error('Failed to select character:', error, error.stack);
             showError('角色选择失败，请刷新页面重试。');
@@ -619,21 +701,18 @@ rightButton.addEventListener('mouseleave', () => {
 
 restartButton.addEventListener('click', () => {
     clearSession();
-    saveHighScore(score, playerNameOrAddress, playerFullAddress);
     restartGame();
 });
 
 gameOverDisplay.addEventListener('click', (e) => {
     if (e.target.id !== 'game-over-restart') return;
     clearSession();
-    saveHighScore(score, playerNameOrAddress, playerFullAddress);
     restartGame();
 });
 
 gameOverDisplay.addEventListener('keydown', (e) => {
     if (e.code === 'Enter') {
         clearSession();
-        saveHighScore(score, playerNameOrAddress, playerFullAddress);
         restartGame();
     }
 });
@@ -668,7 +747,7 @@ function restartGame() {
         character.style.left = `${characterX}%`;
         character.style.transform = `translateX(-50%) scaleX(1) translateZ(0)`;
         character.style.backgroundImage = `url("${selectedCharacterImage}")`;
-        if (scoreDisplay) scoreDisplay.textContent = `得分: ${score} | 最高分: ${highScore}`;
+        if (scoreDisplay) scoreDisplay.textContent = `得分: ${score} | 最高分: -`;
         if (lifeDisplay) lifeDisplay.textContent = `生命: ${life}`;
         if (levelDisplay) levelDisplay.textContent = `等级: ${level}`;
         gameOverDisplay.style.display = 'none';
@@ -678,12 +757,11 @@ function restartGame() {
             <div>游戏结束！</div>
             <div id="game-over-level">等级: ${level}</div>
             <div id="game-over-score">得分: ${score}</div>
-            <div id="game-over-high-score">最高分: ${highScore}</div>
+            <div id="game-over-high-score">最高分: -</div>
             <div id="game-over-life">生命: ${life}</div>
             <div>再试一次，挑战更高分数！</div>
             <button id="game-over-restart" aria-label="重新开始游戏">重新开始</button>
         `;
-        console.log('Coins before cleanup:', coins.length, 'coinCount:', coinCount);
         coins.forEach(coin => {
             if (coin.parentNode) {
                 coin.cleanup();
@@ -692,8 +770,9 @@ function restartGame() {
         });
         coins.length = 0;
         coinCount = 0;
-        console.log('Coins after cleanup:', coins.length, 'coinCount:', coinCount);
         cachedCharacterRect = null;
+        // Ensure gameAreaRect is initialized before spawning coins
+        updateGameAreaRect();
         const initialCoinCount = Math.floor(Math.random() * 3) + 1;
         for (let i = 0; i < initialCoinCount; i++) {
             spawnCoin();
@@ -703,7 +782,6 @@ function restartGame() {
         lastFrameTime = performance.now();
         lastSessionSave = performance.now();
         updateCoinSpeed();
-        updateGameAreaRect();
         startScreen.classList.remove('show');
         nameInputScreen.classList.remove('show');
         characterSelection.style.display = 'none';
@@ -722,7 +800,6 @@ function restartGame() {
 
 function getExplosion() {
     try {
-        console.log('Explosion pool size:', explosionPool.length);
         let explosion = explosionPool.find(e => !e.parentNode);
         if (!explosion) {
             if (explosionPool.length >= maxExplosionPoolSize) {
@@ -736,7 +813,6 @@ function getExplosion() {
         explosion.addEventListener('animationend', () => {
             if (explosion.parentNode) {
                 explosion.remove();
-                console.log('Explosion removed');
             }
         });
         return explosion;
@@ -763,6 +839,14 @@ function updateCoinSpeed() {
 function spawnCoin() {
     try {
         if (coinCount >= currentConfig.maxCoins(level) || isGameOver) return;
+        // Ensure gameAreaRect is initialized
+        if (!gameAreaRect) {
+            updateGameAreaRect();
+            if (!gameAreaRect) {
+                console.warn('gameAreaRect still null, skipping coin spawn');
+                return;
+            }
+        }
         const coin = document.createElement('div');
         coin.classList.add('coin');
         const maxX = gameArea.offsetWidth - 70;
@@ -772,9 +856,11 @@ function spawnCoin() {
             randomX = Math.random() * maxX;
             isValidPosition = true;
             coins.forEach(existingCoin => {
-                const existingRect = existingCoin.getBoundingClientRect();
-                if (Math.abs(randomX - (existingRect.left - gameAreaRect.left)) < 80) {
-                    isValidPosition = false;
+                if (existingCoin.parentNode) { // Only check coins in DOM
+                    const existingRect = existingCoin.getBoundingClientRect();
+                    if (Math.abs(randomX - (existingRect.left - gameAreaRect.left)) < 80) {
+                        isValidPosition = false;
+                    }
                 }
             });
         } while (!isValidPosition);
@@ -836,10 +922,13 @@ function collectCoin(coin) {
             level = newLevel;
             if (levelDisplay) levelDisplay.textContent = `等级: ${level}`;
             updateCoinSpeed();
+            try {
+                logEvent(analytics, 'level_up', { level: newLevel });
+            } catch (error) {
+                console.error('Analytics level_up event failed:', error);
+            }
         }
-        highScore = Math.max(highScore, score);
-        localStorage.setItem('highScore', highScore);
-        if (scoreDisplay) scoreDisplay.textContent = `得分: ${score} | 最高分: ${highScore}`;
+        if (scoreDisplay) scoreDisplay.textContent = `得分: ${score} | 最高分: -`;
         spawnInterval = Math.max(currentConfig.minSpawnInterval, spawnInterval - currentConfig.spawnIntervalDecrease);
 
         const rect = coin.getBoundingClientRect();
@@ -867,6 +956,15 @@ function collectCoin(coin) {
             coin.remove();
             coins.splice(coins.indexOf(coin), 1);
             coinCount--;
+        }
+        try {
+            logEvent(analytics, 'collect_coin', {
+                score_increase: 10,
+                level: level,
+                character: selectedCharacterImage.split('/').pop()
+            });
+        } catch (error) {
+            console.error('Analytics collect_coin event failed:', error);
         }
         saveSession();
     } catch (error) {
@@ -910,13 +1008,12 @@ function checkCollisions() {
 function gameOver() {
     try {
         isGameOver = true;
-        console.log('Game over, coins:', coins.length, 'coinCount:', coinCount);
         saveHighScore(score, playerNameOrAddress, playerFullAddress);
         gameOverDisplay.innerHTML = `
             <div>游戏结束！</div>
             <div id="game-over-level">等级: ${level}</div>
             <div id="game-over-score">得分: ${score}</div>
-            <div id="game-over-high-score">最高分: ${highScore}</div>
+            <div id="game-over-high-score">最高分: -</div>
             <div id="game-over-life">生命: ${life}</div>
             <div>再试一次，挑战更高分数！</div>
             <button id="game-over-restart" aria-label="重新开始游戏">重新开始</button>
@@ -932,8 +1029,17 @@ function gameOver() {
         });
         coins.length = 0;
         coinCount = 0;
-        console.log('Coins after game over cleanup:', coins.length, 'coinCount:', coinCount);
         bgMusic.pause();
+        try {
+            logEvent(analytics, 'game_over', {
+                final_score: score,
+                level_reached: level,
+                lives_remaining: life,
+                reason: life <= 0 ? 'out_of_lives' : 'quit'
+            });
+        } catch (error) {
+            console.error('Analytics game_over event failed:', error);
+        }
         saveSession();
     } catch (error) {
         console.error('Failed to end game:', error, error.stack);
@@ -962,7 +1068,7 @@ function gameLoop(timestamp) {
             lastFrameTime = timestamp;
             const duration = performance.now() - start;
             if (duration > 16) {
-                console.warn(`Slow frame: ${duration.toFixed(2)}ms, coins: ${coinCount}, level: ${level}, collision: ${timestamp - lastCollisionCheck}ms, spawn: ${timestamp - lastSpawnTime}ms`);
+                console.warn(`Slow frame: ${duration.toFixed(2)}ms, coins: ${coinCount}, level: ${level}`);
                 if (duration > 50) {
                     console.warn('Pausing coin spawn due to slow frame');
                     lastSpawnTime += 500;
@@ -975,6 +1081,20 @@ function gameLoop(timestamp) {
     }
     if (!isGameOver) requestAnimationFrame(gameLoop);
 }
+
+function updateGameAreaRect() {
+    try {
+        gameAreaRect = gameArea.getBoundingClientRect();
+    } catch (error) {
+        console.error('Failed to update game area rect:', error, error.stack);
+    }
+}
+
+let resizeTimeout;
+window.addEventListener('resize', () => {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(updateGameAreaRect, 100);
+});
 
 character.onerror = () => {
     character.style.backgroundImage = `url("${fallbackCharacterImage}")`;
@@ -997,7 +1117,6 @@ document.addEventListener('visibilitychange', () => {
             updateGameAreaRect();
             updateCoinSpeed();
             addressContainer.style.display = 'flex';
-            console.log('Resuming game, state reset');
             requestAnimationFrame(gameLoop);
             bgMusic.play().catch(error => {
                 console.error('Background music failed to play:', error, error.stack);
@@ -1012,43 +1131,16 @@ document.addEventListener('visibilitychange', () => {
 document.addEventListener('DOMContentLoaded', () => {
     console.log('DOM content loaded');
     try {
-        const scoreDisplay = document.getElementById('score');
-        const lifeDisplay = document.getElementById('life');
-        const levelDisplay = document.getElementById('level');
-        const addressContainer = document.getElementById('address-container');
-        const addressText = document.getElementById('address-text');
-        const copyButton = document.getElementById('copy-button');
-        const gameOverOverlay = document.getElementById('game-over-overlay');
-        const resumeButton = document.getElementById('resume-button');
-        const missingElements = [];
-        if (!scoreDisplay) missingElements.push('score');
-        if (!lifeDisplay) missingElements.push('life');
-        if (!levelDisplay) missingElements.push('level');
-        if (!addressContainer) missingElements.push('address-container');
-        if (!addressText) missingElements.push('address-text');
-        if (!copyButton) missingElements.push('copy-button');
-        if (!gameOverOverlay) missingElements.push('game-over-overlay');
-        if (!resumeButton) missingElements.push('resume-button');
-        if (missingElements.length > 0) {
-            console.error(`Missing DOM elements during initialization: ${missingElements.join(', ')}`);
-            document.body.innerHTML += `<div style="color: red; text-align: center; padding: 10px;">
-                警告：缺少元素 (${missingElements.join(', ')})。游戏可能不完整。
-            </div>`;
-        } else {
-            scoreDisplay.textContent = `得分: ${score} | 最高分: ${highScore}`;
-            lifeDisplay.textContent = `生命: ${life}`;
-            levelDisplay.textContent = `等级: ${level}`;
-            addressContainer.style.display = 'none';
-            if (localStorage.getItem('gameSession')) {
-                resumeButton.style.display = 'inline-block';
-            } else {
-                resumeButton.style.display = 'none';
-            }
-        }
+        scoreDisplay.textContent = `得分: ${score} | 最高分: -`;
+        lifeDisplay.textContent = `生命: ${life}`;
+        levelDisplay.textContent = `等级: ${level}`;
+        addressContainer.style.display = 'none';
         startScreen.classList.add('show');
         nameInputScreen.classList.remove('show');
         characterSelection.style.display = 'none';
         leaderboardScreen.classList.remove('show');
+        // Initialize gameAreaRect on load to prevent null issues
+        updateGameAreaRect();
         console.log('Initial game state set');
     } catch (error) {
         console.error('Failed to initialize game state:', error, error.stack);
